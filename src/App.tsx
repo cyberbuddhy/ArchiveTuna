@@ -12,6 +12,8 @@ const AlbumDetailModal = lazy(() => import("./components/AlbumDetailModal").then
 const ArtistDiscographyModal = lazy(() => import("./components/ArtistDiscographyModal").then((m) => ({ default: m.ArtistDiscographyModal })));
 const SettingsModal = lazy(() => import("./components/SettingsModal").then((m) => ({ default: m.SettingsModal })));
 const KeyboardShortcutsModal = lazy(() => import("./components/KeyboardShortcutsModal").then((m) => ({ default: m.KeyboardShortcutsModal })));
+const OnboardingModal = lazy(() => import("./components/OnboardingModal").then((m) => ({ default: m.OnboardingModal })));
+import { hasSeenOnboarding, markOnboardingDone } from "./components/OnboardingModal";
 import { fetchAlbumDetails } from "./services/api";
 import {
   getStoredAlbums,
@@ -83,6 +85,7 @@ export default function App() {
   const [sharedMix, setSharedMix] = useState<{ name: string; tracks: Track[] } | null>(null);
   const [discographyArtist, setDiscographyArtist] = useState<string | null>(null);
   const [externalSearchQuery, setExternalSearchQuery] = useState<{ query: string; field?: string } | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(() => !hasSeenOnboarding());
 
   // Global App-Level Keyboard Navigation & Shortcuts
   useEffect(() => {
@@ -738,6 +741,18 @@ export default function App() {
           isOpen={isShortcutsModalOpen}
           onClose={() => setIsShortcutsModalOpen(false)}
         />
+
+        {/* First-run onboarding tour */}
+        {showOnboarding && (
+          <Suspense fallback={null}>
+            <OnboardingModal
+              onDone={() => {
+                markOnboardingDone();
+                setShowOnboarding(false);
+              }}
+            />
+          </Suspense>
+        )}
         </Suspense>
       </div>
     </PlayerProvider>
