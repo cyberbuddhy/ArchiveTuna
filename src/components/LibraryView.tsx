@@ -531,14 +531,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center space-x-2 shrink-0 self-end sm:self-auto">
+        {/* Action Buttons: uniform size */}
+        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
           {activeSubTab === "playlists" && (
             <button
               onClick={() => setIsCreatingPlaylist(true)}
-              className="px-2.5 py-2 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-medium text-xs rounded-xl transition-colors flex items-center space-x-1.5 cursor-pointer"
+              className="flex-1 sm:flex-none h-9 px-3 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-medium text-xs rounded-xl transition-colors flex items-center justify-center space-x-1.5 cursor-pointer whitespace-nowrap"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-3.5 h-3.5 shrink-0" />
               <span>New Playlist</span>
             </button>
           )}
@@ -546,20 +546,20 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           <button
             id="vault-capture-album-btn"
             onClick={onOpenCaptureModal}
-            className="px-3.5 py-2 bg-[var(--color-secondary-main)] hover:bg-[var(--color-secondary-light)] text-stone-950 font-semibold text-xs rounded-xl transition-all shadow flex items-center space-x-1.5 cursor-pointer"
+            className="flex-1 sm:flex-none h-9 px-3 bg-[var(--color-secondary-main)] hover:bg-[var(--color-secondary-light)] text-stone-950 font-semibold text-xs rounded-xl transition-all shadow flex items-center justify-center space-x-1.5 cursor-pointer whitespace-nowrap"
             title="Capture album or show by Archive.org URL or ID"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-3.5 h-3.5 shrink-0" />
             <span>Capture Album</span>
           </button>
 
           <button
             id="vault-settings-btn"
             onClick={onOpenSettingsModal || onOpenBackupModal}
-            className="px-3 py-2 bg-stone-900 hover:bg-stone-850 border border-stone-800 hover:border-[var(--color-accent-main)]/50 text-stone-300 hover:text-[var(--color-accent-light)] text-xs font-medium rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm group"
+            className="flex-1 sm:flex-none h-9 px-3 bg-stone-900 hover:bg-stone-850 border border-stone-800 hover:border-[var(--color-accent-main)]/50 text-stone-300 hover:text-[var(--color-accent-light)] text-xs font-medium rounded-xl transition-all flex items-center justify-center space-x-1.5 cursor-pointer shadow-sm group whitespace-nowrap"
             title="Vault settings, color palettes & audio preferences"
           >
-            <Sliders className="w-3.5 h-3.5 text-[var(--color-accent-main)] group-hover:rotate-12 transition-transform duration-200" />
+            <Sliders className="w-3.5 h-3.5 shrink-0 text-[var(--color-accent-main)] group-hover:rotate-12 transition-transform duration-200" />
             <span>Settings</span>
           </button>
         </div>
