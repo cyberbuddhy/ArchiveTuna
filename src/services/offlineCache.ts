@@ -134,27 +134,14 @@ class OfflineCacheService {
   }
 
   /**
-   * Fetch audio stream with direct fetch or audio proxy fallback
+   * Fetch audio stream direct from archive.org (CORS-open, no server needed)
    */
   private async fetchAudioBlob(streamUrl: string): Promise<Blob> {
-    // Try direct fetch first
-    try {
-      const resp = await fetch(streamUrl, { mode: "cors" });
-      if (resp.ok) {
-        const blob = await resp.blob();
-        if (blob.size > 1000) return blob;
-      }
-    } catch {
-      // CORS or network error, fallback to backend proxy
+    const resp = await fetch(streamUrl, { mode: "cors" });
+    if (!resp.ok) {
+      throw new Error(`Failed to fetch audio stream (${resp.status})`);
     }
-
-    // Proxy fallback through server.ts /api/audio-proxy
-    const proxyUrl = `/api/audio-proxy?url=${encodeURIComponent(streamUrl)}`;
-    const proxyResp = await fetch(proxyUrl);
-    if (!proxyResp.ok) {
-      throw new Error(`Failed to fetch audio stream via proxy (${proxyResp.status})`);
-    }
-    const blob = await proxyResp.blob();
+    const blob = await resp.blob();
     if (blob.size <= 1000) {
       throw new Error("Retrieved audio stream is too small or invalid");
     }
