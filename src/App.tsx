@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from "react";
 import { PlayerProvider } from "./context/PlayerContext";
 import { Navbar, NavTabType } from "./components/Navbar";
-import { SearchView } from "./components/SearchView";
-import { DiscoverView } from "./components/DiscoverView";
-import { LibraryView } from "./components/LibraryView";
-import { PlayerBar } from "./components/PlayerBar";
 import { MobileBottomNav } from "./components/MobileBottomNav";
-import { CaptureModal } from "./components/CaptureModal";
-import { DumpBackupModal } from "./components/DumpBackupModal";
-import { AlbumDetailModal } from "./components/AlbumDetailModal";
-import { ArtistDiscographyModal } from "./components/ArtistDiscographyModal";
+const PlayerBar = lazy(() => import("./components/PlayerBar").then((m) => ({ default: m.PlayerBar })));
+const SearchView = lazy(() => import("./components/SearchView").then((m) => ({ default: m.SearchView })));
+const DiscoverView = lazy(() => import("./components/DiscoverView").then((m) => ({ default: m.DiscoverView })));
+const LibraryView = lazy(() => import("./components/LibraryView").then((m) => ({ default: m.LibraryView })));
+const CaptureModal = lazy(() => import("./components/CaptureModal").then((m) => ({ default: m.CaptureModal })));
+const DumpBackupModal = lazy(() => import("./components/DumpBackupModal").then((m) => ({ default: m.DumpBackupModal })));
+const AlbumDetailModal = lazy(() => import("./components/AlbumDetailModal").then((m) => ({ default: m.AlbumDetailModal })));
+const ArtistDiscographyModal = lazy(() => import("./components/ArtistDiscographyModal").then((m) => ({ default: m.ArtistDiscographyModal })));
+const SettingsModal = lazy(() => import("./components/SettingsModal").then((m) => ({ default: m.SettingsModal })));
+const KeyboardShortcutsModal = lazy(() => import("./components/KeyboardShortcutsModal").then((m) => ({ default: m.KeyboardShortcutsModal })));
 import { fetchAlbumDetails } from "./services/api";
 import {
   getStoredAlbums,
@@ -24,8 +26,6 @@ import { Album, Playlist, Track, ListenHistoryItem, TierList } from "./types";
 import { CheckCircle2 } from "lucide-react";
 import { ArchiveLogo } from "./components/ArchiveLogo";
 import { THEMES, getStoredThemeId, saveThemeId, applyThemeToDOM } from "./services/themes";
-import { SettingsModal } from "./components/SettingsModal";
-import { KeyboardShortcutsModal } from "./components/KeyboardShortcutsModal";
 
 export default function App() {
   const getTabFromHash = (): NavTabType => {
@@ -183,6 +183,10 @@ export default function App() {
   // Notification toast
   const [toastMessage, setToastMessage] = useState<{ text: string; type: "success" | "info" } | null>(
     null
+  );
+
+  const tabFallback = (
+    <div className="py-20 text-center text-xs text-stone-500">Loading…</div>
   );
 
   const showToast = (text: string, type: "success" | "info" = "success") => {
@@ -467,10 +471,10 @@ export default function App() {
           </div>
         )}
 
-        {/* Main Content Area: 3 Distinct Sections (kept mounted to preserve state across tab switching) */}
+        {/* Main Content Area: active tab only (code-split per tab for fast first paint) */}
         <main className="flex-1 max-w-6xl w-full mx-auto px-3 sm:px-6 pt-4 sm:pt-5 pb-36 sm:pb-12">
-          {/* Section 1: Search */}
-          <div className={activeTab === "search" ? "block" : "hidden"}>
+          <Suspense fallback={tabFallback}>
+          {activeTab === "search" && (
             <SearchView
               onCaptureAlbum={handleAlbumCaptured}
               onSelectAlbumForDetail={handleSelectAlbumForDetail}
@@ -480,20 +484,18 @@ export default function App() {
               onOpenArtistDiscography={(artist) => setDiscographyArtist(artist)}
               initialSearch={externalSearchQuery}
             />
-          </div>
+          )}
 
-          {/* Section 2: Discover */}
-          <div className={activeTab === "discover" ? "block" : "hidden"}>
+          {activeTab === "discover" && (
             <DiscoverView
               onCaptureAlbum={handleAlbumCaptured}
               onSelectAlbumForDetail={handleSelectAlbumForDetail}
               existingAlbumIds={existingAlbumIds}
               onOpenArtistDiscography={(artist) => setDiscographyArtist(artist)}
             />
-          </div>
+          )}
 
-          {/* Section 3: Vault */}
-          <div className={activeTab === "vault" ? "block" : "hidden"}>
+          {activeTab === "vault" && (
             <LibraryView
               albums={albums}
               playlists={playlists}
@@ -514,7 +516,8 @@ export default function App() {
               onShowToast={showToast}
               onOpenArtistDiscography={(artist) => setDiscographyArtist(artist)}
             />
-          </div>
+          )}
+          </Suspense>
         </main>
 
         {/* Archival Information Footer */}
@@ -534,7 +537,8 @@ export default function App() {
           </div>
         </footer>
 
-        {/* Persistent Audio Player Bar */}
+        {/* Persistent Audio Player Bar (lazy: not needed for first paint) */}
+        <Suspense fallback={null}>
         <PlayerBar
           onSelectAlbumForDetail={handleSelectAlbumForDetail}
           onOpenArtistDiscography={(artist) => setDiscographyArtist(artist)}
@@ -544,6 +548,7 @@ export default function App() {
             return !!a?.isFavorite;
           }}
         />
+        </Suspense>
 
         {/* Spotify-Style Mobile Bottom Navigation */}
         <MobileBottomNav
@@ -552,6 +557,8 @@ export default function App() {
           onResetSearch={handleResetToSearch}
         />
 
+        {/* Lazy modals: chunks load only when opened */}
+        <Suspense fallback={null}>
         {/* Capture Album Modal */}
         <CaptureModal
           isOpen={isCaptureModalOpen}
@@ -627,6 +634,7 @@ export default function App() {
           isOpen={isShortcutsModalOpen}
           onClose={() => setIsShortcutsModalOpen(false)}
         />
+        </Suspense>
       </div>
     </PlayerProvider>
   );

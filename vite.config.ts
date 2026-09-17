@@ -16,6 +16,16 @@ export default defineConfig(() => {
       outDir: 'dist',
       assetsDir: 'assets',
       emptyOutDir: true,
+      chunkSizeWarningLimit: 300,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return;
+            if (id.includes('lucide-react')) return 'icons';
+            if (id.includes('/react-dom/') || id.includes('/react/') || id.includes('scheduler')) return 'vendor';
+          },
+        },
+      },
     },
     server: {
       host: '0.0.0.0',
