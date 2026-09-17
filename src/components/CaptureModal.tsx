@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { X, DownloadCloud, Music, AlertCircle, CheckCircle2, Loader2, Link2, ExternalLink } from "lucide-react";
-import { resolveUrlOrIdentifier, fetchAlbumDetails } from "../services/api";
+import { ingestUrl, IngestQuality } from "../services/ingest";
 import { Album } from "../types";
 
 interface CaptureModalProps {
@@ -17,6 +17,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
   existingAlbumIds,
 }) => {
   const [inputUrl, setInputUrl] = useState("");
+  const [quality, setQuality] = useState<IngestQuality>("auto");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewAlbum, setPreviewAlbum] = useState<Album | null>(null);
@@ -34,37 +35,8 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
     setSuccessMessage(null);
 
     try {
-      const resolved = await resolveUrlOrIdentifier(inputUrl.trim());
-      if (resolved.resolvedType === "archive" && resolved.identifier) {
-        const album = await fetchAlbumDetails(resolved.identifier);
-        setPreviewAlbum(album);
-      } else if (resolved.resolvedType === "direct_stream" && resolved.streamUrl) {
-        // Direct stream mock-wrapped into an album
-        const directAlbum: Album = {
-          id: `direct_${Date.now()}`,
-          identifier: `direct_${Date.now()}`,
-          title: resolved.title || "Direct Audio Stream",
-          artist: "Independent Stream",
-          tracks: [
-            {
-              id: `direct_track_${Date.now()}`,
-              title: resolved.title || "Audio Stream",
-              artist: "Independent Stream",
-              album: "Direct Audio Stream",
-              albumId: `direct_${Date.now()}`,
-              trackNumber: 1,
-              duration: 0,
-              streamUrl: resolved.streamUrl,
-              format: "Audio Stream",
-            },
-          ],
-          source: "Direct Stream",
-          capturedAt: new Date().toISOString(),
-        };
-        setPreviewAlbum(directAlbum);
-      } else {
-        setError("Could not extract music album metadata from the provided link.");
-      }
+      const album = await ingestUrl(inputUrl.trim(), quality);
+      setPreviewAlbum(album);
     } catch (err: any) {
       setError(err.message || "Failed to capture album from URL");
     } finally {
@@ -120,6 +92,12 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
           </p>
 
           <form onSubmit={handleResolve} className="space-y-3">
+            <div className="flex gap-2">
+              {(["auto", "mp3", "flac"] as IngestQuality[]).map((q) => (
+                <button key={q} type="button" onClick={() => setQuality(q)} className={`px-2 py-1 text-[11px] rounded-lg border cursor-pointer ${quality === q ? "bg-amber-500 text-stone-950 border-amber-500 font-bold" : "bg-stone-950 text-stone-400 border-stone-800"}`}>{q.toUpperCase()}</button>
+              ))}
+              <span className="text-[10px] text-stone-500 self-center">format negotiation · ID3 preserved</span>
+            </div>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-500">
                 <Link2 className="w-4 h-4" />

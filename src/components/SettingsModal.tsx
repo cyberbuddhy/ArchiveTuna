@@ -30,6 +30,7 @@ import {
   getStoredPlayerSettings,
   savePlayerSettings,
 } from "../services/playerSettings";
+import { EQ_FREQS } from "../services/audioEngine";
 import { Album, Playlist } from "../types";
 import { dumpLibraryToFile, parseAndValidateDump, restoreLibraryFromDump, getStoredHistory } from "../services/storage";
 import { offlineCache } from "../services/offlineCache";
@@ -71,10 +72,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isClearingOffline, setIsClearingOffline] = useState(false);
 
   // Restore file import states
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [restoreMode, setRestoreMode] = useState<"merge" | "replace">("merge");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);  const [restoreMode, setRestoreMode] = useState<"merge" | "replace">("merge");
   const [restoreStatus, setRestoreStatus] = useState<string | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [eqName, setEqName] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -125,6 +126,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleUpdate = (partial: Partial<PlayerSettings>) => {
     const updated = savePlayerSettings(partial);
     setSettings(updated);
+  };
+
+  // EQ helpers (eqName state lives with the other hooks above)
+  const eq = settings.eq ?? [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  const eqProfiles = settings.eqProfiles ?? [];
+
+  const handleEqBand = (i: number, v: number) => {
+    const n = [...eq];
+    n[i] = v;
+    handleUpdate({ eq: n, activeEqProfile: "Custom" });
+  };
+
+  const handleApplyProfile = (name: string) => {
+    const p = eqProfiles.find((x) => x.name === name);
+    if (p) handleUpdate({ eq: [...p.eq], activeEqProfile: p.name });
+  };
+
+  const handleSaveProfile = () => {
+    const name = eqName.trim().slice(0, 24);
+    if (!name) return;
+    const rest = eqProfiles.filter((x) => x.name !== name);
+    handleUpdate({ eqProfiles: [...rest, { name, eq: [...eq] }], activeEqProfile: name });
+    setEqName("");
+    if (onShowToast) onShowToast(`EQ profile "${name}" saved`, "success");
+  };
+
+  const handleDeleteProfile = (name: string) => {
+    if (name === "Flat") return;
+    const rest = eqProfiles.filter((x) => x.name !== name);
+    const patch: Partial<PlayerSettings> =
+      settings.activeEqProfile === name
+        ? { eqProfiles: rest, eq: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], activeEqProfile: "Flat" }
+        : { eqProfiles: rest };
+    handleUpdate(patch);
   };
 
   const handleSetSleepTimer = (minutes: number) => {
@@ -541,6 +576,128 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       }`}
                     />
                   </button>
+                </div>
+              </div>
+
+              {/* 5. Graphic Equalizer + Saved Profiles */}
+              <div className="p-3.5 rounded-xl bg-stone-950/40 border border-stone-850 space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Sliders className="w-4 h-4 text-amber-400" />
+                  <div>
+                    <h4 className="font-semibold text-stone-200">Graphic Equalizer</h4>
+                    <p className="text-stone-400 text-[11px]">
+                      10-band studio EQ applied live to playback
+                    </p>
+                  </div>
+                </div>
+
+                {/* Profile chips */}
+                <div className="flex flex-wrap gap-1.5">
+                  {eqProfiles.map((p) => {
+                    const active = settings.activeEqProfile === p.name;
+                    return (
+                      <span
+                        key={p.name}
+                        className={`inline-flex items-center rounded-lg border text-[11px] transition-all ${
+                          active
+                            ? "bg-amber-500/20 border-amber-500/60 text-amber-200 font-semibold"
+                            : "bg-stone-900 border-stone-800 text-stone-300"
+                        }`}
+                      >
+                        <button
+                          onClick={() => handleApplyProfile(p.name)}
+                          className="px-2.5 py-1.5 cursor-pointer"
+                        >
+                          {p.name}
+                        </button>
+                        {p.name !== "Flat" && (
+                          <button
+                            onClick={() => handleDeleteProfile(p.name)}
+                            className="pr-2 text-stone-500 hover:text-red-400 cursor-pointer"
+                            title={`Delete ${p.name}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })}
+                  {settings.activeEqProfile === "Custom" && (
+                    <span className="px-2.5 py-1.5 rounded-lg border text-[11px] bg-stone-800 border-stone-700 text-stone-300 italic">
+                      Custom (unsaved tweaks)
+                    </span>
+                  )}
+                </div>
+
+                {/* Save current as profile */}
+                <div className="flex gap-2">
+                  <input
+                    value={eqName}
+                    onChange={(e) => setEqName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSaveProfile()}
+                    placeholder="Name this sound…"
+                    maxLength={24}
+                    className="flex-1 px-2.5 py-1.5 bg-stone-900 border border-stone-800 rounded-lg text-xs text-stone-200 placeholder-stone-600 focus:border-amber-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleSaveProfile}
+                    disabled={!eqName.trim()}
+                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-stone-950 text-xs font-bold rounded-lg cursor-pointer"
+                  >
+                    Save
+                  </button>
+                </div>
+
+                {/* Bands */}
+                <div className="grid grid-cols-5 sm:grid-cols-10 gap-1">
+                  {EQ_FREQS.map((f, i) => (
+                    <label key={f} className="flex flex-col items-center gap-1">
+                      <span className="text-[9px] font-mono text-amber-400 h-3">
+                        {eq[i] > 0 ? `+${eq[i]}` : eq[i]}
+                      </span>
+                      <input
+                        type="range"
+                        min={-12}
+                        max={12}
+                        step={1}
+                        value={eq[i] || 0}
+                        onChange={(e) => handleEqBand(i, Number(e.target.value))}
+                        className="accent-amber-500 cursor-pointer"
+                        style={{ writingMode: "vertical-lr", direction: "rtl", width: "1.25rem", height: "6rem" } as React.CSSProperties}
+                      />
+                      <span className="text-[9px] font-mono text-stone-500">
+                        {f >= 1000 ? `${f / 1000}k` : f}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+
+                {/* Preamp + balance */}
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-[11px] text-stone-400">
+                    Preamp {(settings.preamp ?? 1).toFixed(2)}x
+                    <input
+                      type="range"
+                      min={0.5}
+                      max={1.5}
+                      step={0.05}
+                      value={settings.preamp ?? 1}
+                      onChange={(e) => handleUpdate({ preamp: Number(e.target.value) })}
+                      className="w-full accent-amber-500"
+                    />
+                  </label>
+                  <label className="text-[11px] text-stone-400">
+                    Balance {settings.stereoPan ?? 0}
+                    <input
+                      type="range"
+                      min={-1}
+                      max={1}
+                      step={0.1}
+                      value={settings.stereoPan ?? 0}
+                      onChange={(e) => handleUpdate({ stereoPan: Number(e.target.value) })}
+                      className="w-full accent-amber-500"
+                    />
+                  </label>
                 </div>
               </div>
             </div>

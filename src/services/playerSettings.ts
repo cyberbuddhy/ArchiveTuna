@@ -19,7 +19,31 @@ export interface PlayerSettings {
   // Sleep Timer (duration in minutes, 0 = off, -1 = end of track)
   sleepTimerMinutes: number;
   sleepTimerEndTime: number | null; // timestamp when sleep timer expires
+
+  // Studio chain
+  eq?: number[];
+  preamp?: number;
+  stereoPan?: number;
+  radioInfinite?: boolean;
+
+  // Saved EQ profiles
+  eqProfiles: EqProfile[];
+  activeEqProfile: string;
 }
+
+export interface EqProfile {
+  name: string;
+  eq: number[];
+}
+
+const FLAT = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+export const FACTORY_EQ_PROFILES: EqProfile[] = [
+  { name: "Flat", eq: [...FLAT] },
+  { name: "Bass Boost", eq: [6, 5, 4, 2, 1, 0, 0, 0, 0, 0] },
+  { name: "Vocal", eq: [-1, 0, 1, 2, 4, 4, 3, 1, 0, -1] },
+  { name: "Treble", eq: [0, 0, 0, 0, 0, 1, 3, 4, 5, 6] },
+];
 
 export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
   themeId: "matte-lavender",
@@ -33,6 +57,12 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
   dataSaver: false,
   sleepTimerMinutes: 0,
   sleepTimerEndTime: null,
+  eq: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  preamp: 1,
+  stereoPan: 0,
+  radioInfinite: false,
+  eqProfiles: FACTORY_EQ_PROFILES.map((p) => ({ ...p, eq: [...p.eq] })),
+  activeEqProfile: "Flat",
 };
 
 const SETTINGS_STORAGE_KEY = "archive_tuner_player_settings";

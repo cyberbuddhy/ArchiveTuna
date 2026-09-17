@@ -29,6 +29,7 @@ import { usePlayer } from "../context/PlayerContext";
 import { Album } from "../types";
 import { fetchAlbumDetails } from "../services/api";
 import { downloadAlbumZip, downloadTrackAudio } from "../utils/download";
+import { Waveform } from "./Waveform";
 
 interface PlayerBarProps {
   onSelectAlbumForDetail?: (album: Album) => void;
@@ -1201,6 +1202,9 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
 
           {/* Right Side: Speed, Volume & Queue */}
           <div className="flex items-center justify-end space-x-2.5 flex-1 sm:max-w-xs">
+            <div className="hidden xl:flex items-center gap-2">
+              <Waveform playing={isPlaying} />
+            </div>
             {/* Playback Speed Pill */}
             <div className="relative">
               <button
