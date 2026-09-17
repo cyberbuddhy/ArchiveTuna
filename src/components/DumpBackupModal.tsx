@@ -233,7 +233,7 @@ export const DumpBackupModal: React.FC<DumpBackupModalProps> = ({
               <p className="text-xs font-medium text-stone-200 text-center">
                 {selectedFile ? selectedFile.name : "Drag & drop your .json library dump here, or click to browse"}
               </p>
-              <p className="text-[11px] text-stone-500 mt-1">Supports all Archive Music Vault backup files</p>
+              <p className="text-[11px] text-stone-500 mt-1">Supports all ArchiveTuna backup files</p>
             </div>
 
             {/* Error Message */}

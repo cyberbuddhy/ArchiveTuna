@@ -106,7 +106,7 @@ export function formatTierListAsText(
   });
 
   if (format === "plain") {
-    let out = `=== ${tierListName.toUpperCase()} ===\nGenerated via Archive Tuner • ${now}\n\n`;
+    let out = `=== ${tierListName.toUpperCase()} ===\nGenerated via ArchiveTuna • ${now}\n\n`;
     TIER_RANKS.forEach((rank) => {
       const list = grouped[rank];
       out += `[${rank} TIER] (${list.length})\n`;
@@ -123,7 +123,7 @@ export function formatTierListAsText(
   }
 
   // Markdown format
-  let md = `# ${tierListName}\n*Generated via Archive Tuner • ${now}*\n\n`;
+  let md = `# ${tierListName}\n*Generated via ArchiveTuna • ${now}*\n\n`;
   TIER_RANKS.forEach((rank) => {
     const list = grouped[rank];
     md += `## ${rank} Tier (${list.length})\n`;
@@ -201,7 +201,7 @@ export async function exportTierListAsImage(
   // Subtitle
   ctx.fillStyle = "#a8a29e";
   ctx.font = "14px sans-serif";
-  ctx.fillText("Archive Tuner • Tier List", 25, 74);
+  ctx.fillText("ArchiveTuna • Tier List", 25, 74);
 
   const startY = headerHeight;
 
