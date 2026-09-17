@@ -661,6 +661,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         max={12}
                         step={1}
                         value={eq[i] || 0}
+                        aria-label={`Equalizer band ${f >= 1000 ? `${f / 1000} kilohertz` : `${f} hertz`}`}
                         onChange={(e) => handleEqBand(i, Number(e.target.value))}
                         className="accent-amber-500 cursor-pointer"
                         style={{ writingMode: "vertical-lr", direction: "rtl", width: "1.25rem", height: "6rem" } as React.CSSProperties}

@@ -4,7 +4,7 @@ import { recordListen } from "../services/storage";
 import { getStoredPlayerSettings, savePlayerSettings, PlayerSettings } from "../services/playerSettings";
 import { audioEngine } from "../services/audioEngine";
 import { offlineCache } from "../services/offlineCache";
-import { readSharedMix } from "../services/share";
+import { fetchAlbumDetails } from "../services/api";
 
 export type RepeatMode = "off" | "all" | "one";
 
@@ -102,16 +102,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Sleep Timer interval monitor
+  // Sleep Timer interval monitor (gentle 4s fade-out)
   useEffect(() => {
     const sleepInterval = setInterval(() => {
       const currentSettings = getStoredPlayerSettings();
       if (currentSettings.sleepTimerEndTime && Date.now() >= currentSettings.sleepTimerEndTime) {
-        if (audioRef.current) {
-          audioRef.current.pause();
+        const audio = audioRef.current;
+        savePlayerSettings({ sleepTimerMinutes: 0, sleepTimerEndTime: null });
+        if (audio && !audio.paused) {
+          audioEngine.fadeOut(audio, 4, () => {
+            audio.pause();
+            setIsPlaying(false);
+          });
+        } else {
           setIsPlaying(false);
         }
-        savePlayerSettings({ sleepTimerMinutes: 0, sleepTimerEndTime: null });
       }
     }, 1000);
 
@@ -189,12 +194,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Check if sleep timer was set to End of Current Track (-1)
     const currentSettings = getStoredPlayerSettings();
     if (currentSettings.sleepTimerMinutes === -1) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-      setIsPlaying(false);
-      setCurrentTime(0);
+      const audio = audioRef.current;
       savePlayerSettings({ sleepTimerMinutes: 0, sleepTimerEndTime: null });
+      if (audio && !audio.paused) {
+        audioEngine.fadeOut(audio, 3, () => {
+          audio.pause();
+          setIsPlaying(false);
+        });
+      } else {
+        setIsPlaying(false);
+      }
+      setCurrentTime(0);
       return;
     }
 
@@ -229,6 +239,31 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Loop back to start
       setQueueIndex(0);
       loadAndPlay(q[0]);
+    } else if (getStoredPlayerSettings().radioInfinite) {
+      // Autoplay: queue exhausted — keep the music going with related tracks
+      const seed = stateRef.current.currentTrack;
+      if (!seed) { setIsPlaying(false); setCurrentTime(0); return; }
+      const seedId = seed.id;
+      setIsLoading(true);
+      (async () => {
+        try {
+          const { fetchRelatedTracks } = await import("../services/autoplay");
+          const st = stateRef.current;
+          // User moved on mid-fetch: abort, don't hijack playback
+          if (st.currentTrack?.id !== seedId) { setIsLoading(false); return; }
+          const known = new Set(st.queue.map((t) => t?.id));
+          const rel = (await fetchRelatedTracks(st.currentTrack, st.queue.map((t) => t?.albumId || t?.id || ""))).filter((t) => !known.has(t.id));
+          if (!rel.length) { setIsLoading(false); setIsPlaying(false); setCurrentTime(0); return; }
+          const base = stateRef.current.queue;
+          const fresh = [...base, ...rel];
+          setQueue(fresh);
+          setQueueIndex(base.length);
+          loadAndPlay(fresh[base.length]);
+        } catch {
+          setIsLoading(false);
+          setIsPlaying(false);
+        }
+      })();
     } else {
       setIsPlaying(false);
       setCurrentTime(0);
@@ -272,9 +307,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const handleEnded = () => handleAutoAdvance();
 
     const handleError = () => {
-      // Static build: no server proxy — direct archive.org streams only
+      // Static build: no server proxy — announce + skip to next
       setIsLoading(false);
       setIsPlaying(false);
+      const { currentTrack: t } = stateRef.current;
+      window.dispatchEvent(new CustomEvent("archive_track_error", {
+        detail: t ? `Couldn't play "${t.title}" — skipped ahead.` : "Track unavailable — skipped ahead.",
+      }));
+      handleAutoAdvance();
     };
 
     audio.addEventListener("timeupdate", handleTimeUpdate);
@@ -309,6 +349,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     recordedRef.current = false;
     prefetchedRef.current = null;
+    toppingUpRef.current = false;
     setCurrentTrack(track);
     if (album) setCurrentAlbum(album);
     setCurrentTime(0);
@@ -534,11 +575,31 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const getAudioElement = () => audioRef.current;
 
-  // Prefetch next track at 80% / 15s remaining for zero-gap
+  // Prefetch next track at 80% / 15s remaining for zero-gap.
+  // Autoplay top-up: on the last queued track, line up related tracks early.
+  const toppingUpRef = useRef(false);
   useEffect(() => {
     if (!currentTrack || !duration) return;
     const remain = duration - currentTime;
     const next = queue[queueIndex + 1];
+    if (!next && getStoredPlayerSettings().radioInfinite && !toppingUpRef.current
+        && (remain < 30 || currentTime / duration > 0.6)) {
+      toppingUpRef.current = true;
+      const seedId = currentTrack.id;
+      (async () => {
+        try {
+          const { fetchRelatedTracks } = await import("../services/autoplay");
+          const st = stateRef.current;
+          if (st.currentTrack?.id !== seedId) return;
+          const known = new Set(st.queue.map((t) => t?.id));
+          const rel = (await fetchRelatedTracks(st.currentTrack, st.queue.map((t) => t?.albumId || t?.id || ""))).filter((t) => !known.has(t.id));
+          if (rel.length && stateRef.current.currentTrack?.id === seedId) {
+            setQueue((prev) => [...prev, ...rel.filter((t) => !prev.some((p) => p.id === t.id))]);
+          }
+        } catch { /* offline or upstream hiccup — auto-advance will retry at track end */ }
+      })();
+      return;
+    }
     if (!next || prefetchedRef.current === next.id) return;
     if (remain < 15 || currentTime / duration > 0.8) {
       prefetchedRef.current = next.id;
@@ -570,17 +631,24 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Shared mixtape deep-link (#mix=...) -> queue instantly, zero auth
+  // Shared song link (#s=album:track) -> play it in album context
   useEffect(() => {
-    try {
-      const shared = readSharedMix();
-      if (shared && shared.length) {
-        setQueue(shared);
-        setQueueIndex(0);
-        loadAndPlay(shared[0]);
-        history.replaceState(null, "", location.pathname + location.search);
-      }
-    } catch { /* noop */ }
+    const onPlaySong = (e: Event) => {
+      const { albumId, track } = (e as CustomEvent<{ albumId: string; track: number }>).detail || {};
+      if (!albumId) return;
+      (async () => {
+        try {
+          const album = await fetchAlbumDetails(albumId);
+          const t = album.tracks.find((x) => x.trackNumber === track) || album.tracks[track - 1] || album.tracks[0];
+          if (!t) return;
+          setQueue(album.tracks);
+          setQueueIndex(album.tracks.indexOf(t));
+          loadAndPlay(t, album);
+        } catch { /* noop */ }
+      })();
+    };
+    window.addEventListener("archive_play_song", onPlaySong);
+    return () => window.removeEventListener("archive_play_song", onPlaySong);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

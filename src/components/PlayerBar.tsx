@@ -30,6 +30,7 @@ import { Album } from "../types";
 import { fetchAlbumDetails } from "../services/api";
 import { downloadAlbumZip, downloadTrackAudio } from "../utils/download";
 import { Waveform } from "./Waveform";
+import { getStoredPlayerSettings, savePlayerSettings } from "../services/playerSettings";
 
 interface PlayerBarProps {
   onSelectAlbumForDetail?: (album: Album) => void;
@@ -84,6 +85,26 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [hoverPosition, setHoverPosition] = useState<number>(0);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [autoplay, setAutoplay] = useState(() => !!getStoredPlayerSettings().radioInfinite);
+  const toggleAutoplay = () => {
+    const next = !autoplay;
+    setAutoplay(next);
+    savePlayerSettings({ radioInfinite: next });
+  };
+  const autoplayPill = (
+    <button
+      type="button"
+      onClick={toggleAutoplay}
+      title={autoplay ? "Autoplay on: related tracks keep playing" : "Autoplay off"}
+      className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg border transition-colors cursor-pointer ${
+        autoplay
+          ? "bg-amber-500 text-stone-950 border-amber-500"
+          : "bg-stone-900 text-stone-400 border-stone-800 hover:text-stone-200"
+      }`}
+    >
+      Autoplay {autoplay ? "On" : "Off"}
+    </button>
+  );
   const scrubberRef = useRef<HTMLDivElement | null>(null);
   const mobileScrubberRef = useRef<HTMLDivElement | null>(null);
   const miniPlayerTouchRef = useRef<{ x: number; y: number; time: number } | null>(null);
@@ -476,6 +497,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
               <button
                 onClick={togglePlay}
                 disabled={isLoading}
+                aria-label={isPlaying ? "Pause" : "Play"}
                 className="w-16 h-16 rounded-full bg-[var(--color-accent-main)] text-stone-950 flex items-center justify-center shadow-[0_0_25px_-5px_var(--color-accent-main)] active:scale-95 transition-transform cursor-pointer"
                 title={isPlaying ? "Pause" : "Play"}
               >
@@ -656,6 +678,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
             <button
               onClick={togglePlay}
               disabled={isLoading}
+              aria-label={isPlaying ? "Pause" : "Play"}
               className="w-9 h-9 rounded-full bg-[var(--color-accent-main)] hover:bg-[var(--color-accent-light)] text-stone-950 flex items-center justify-center shadow-md active:scale-95 transition-transform cursor-pointer"
               title={isPlaying ? "Pause" : "Play"}
             >
@@ -705,6 +728,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
             </div>
 
             <div className="flex items-center space-x-2">
+              {autoplayPill}
               {queue.length > 0 && (
                 <button
                   type="button"
@@ -859,12 +883,15 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
                   </p>
                 </div>
               </div>
+              <div className="flex items-center space-x-2">
+              {autoplayPill}
               <button
                 onClick={clearQueue}
                 className="px-2 py-1 text-[11px] font-medium text-stone-400 hover:text-red-400 bg-stone-900 hover:bg-stone-850 rounded-lg border border-stone-800 transition-colors cursor-pointer"
               >
                 Clear Queue
               </button>
+              </div>
             </div>
 
             <div className="space-y-1 pt-2">
@@ -1137,6 +1164,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
                 id="player-play-pause-btn"
                 onClick={togglePlay}
                 disabled={isLoading}
+                aria-label={isPlaying ? "Pause" : "Play"}
                 className="w-10 h-10 rounded-full bg-[var(--color-accent-main)] hover:bg-[var(--color-accent-light)] text-stone-950 flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-md"
                 title={isPlaying ? "Pause (Space)" : "Play (Space)"}
               >

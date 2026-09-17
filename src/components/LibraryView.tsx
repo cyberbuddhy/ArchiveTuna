@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   Search,
   Grid,
@@ -20,11 +20,12 @@ import {
   Layers,
   User,
   Shuffle,
-  Sliders,
   Database,
+  Share2,
 } from "lucide-react";
 import { Album, Track, Playlist, TierList } from "../types";
 import { usePlayer } from "../context/PlayerContext";
+import { linkForPlaylist } from "../services/share";
 import { downloadAlbumZip, downloadTrackAudio } from "../utils/download";
 import { TierListView } from "./TierListView";
 import { TIER_CONFIG } from "../utils/tierList";
@@ -67,7 +68,6 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onDeleteAlbum,
   onOpenCaptureModal,
   onOpenBackupModal,
-  onOpenSettingsModal,
   onAddTrackToPlaylist,
   onCreatePlaylist,
   onDeletePlaylist,
@@ -79,6 +79,16 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onOpenArtistDiscography,
 }) => {
   const { playTrack, playAlbum, playRandomTracks, currentTrack, isPlaying } = usePlayer();
+
+  // Tab switched here: focus vault search so it's ready to type (desktop pointers only)
+  useEffect(() => {
+    if (window.matchMedia?.("(pointer: fine)").matches) {
+      const t = setTimeout(() => {
+        (document.getElementById("vault-general-search") as HTMLInputElement | null)?.focus();
+      }, 60);
+      return () => clearTimeout(t);
+    }
+  }, []);
   const SUBTABS: Array<"albums" | "offline" | "liked" | "artists" | "tierlists" | "playlists" | "songs"> = [
     "albums",
     "offline",
@@ -517,6 +527,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             id="vault-general-search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // Release focus back to global keybindings (Space/K/J/L/arrows)
+              if (e.key === "Escape") (e.target as HTMLInputElement).blur();
+            }}
             placeholder="Search vault albums, playlists, songs, tier lists..."
             className="w-full h-10 pl-9 pr-8 bg-stone-900 border border-stone-800 hover:border-stone-700 rounded-xl text-stone-100 placeholder-stone-400 text-xs leading-normal focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all shadow-sm"
           />
@@ -551,16 +565,6 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           >
             <Plus className="w-3.5 h-3.5 shrink-0" />
             <span>Capture Album</span>
-          </button>
-
-          <button
-            id="vault-settings-btn"
-            onClick={onOpenSettingsModal || onOpenBackupModal}
-            className="flex-1 sm:flex-none h-9 px-3 bg-stone-900 hover:bg-stone-850 border border-stone-800 hover:border-[var(--color-accent-main)]/50 text-stone-300 hover:text-[var(--color-accent-light)] text-xs font-medium rounded-xl transition-all flex items-center justify-center space-x-1.5 cursor-pointer shadow-sm group whitespace-nowrap"
-            title="Vault settings, color palettes & audio preferences"
-          >
-            <Sliders className="w-3.5 h-3.5 shrink-0 text-[var(--color-accent-main)] group-hover:rotate-12 transition-transform duration-200" />
-            <span>Settings</span>
           </button>
         </div>
       </div>
@@ -1060,6 +1064,22 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       >
                         <Play className="w-3 h-3 fill-stone-950" />
                         <span>Play All</span>
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard?.writeText(await linkForPlaylist(activePlaylist.name, activePlaylist.tracks));
+                            if (onShowToast) onShowToast("Mixtape link copied — anyone opening it gets these tracks", "success");
+                          } catch {
+                            if (onShowToast) onShowToast("Couldn't copy link", "info");
+                          }
+                        }}
+                        disabled={activePlaylist.tracks.length === 0}
+                        className="p-1.5 text-stone-400 hover:text-amber-400 disabled:opacity-40"
+                        title="Copy shareable mixtape link"
+                        aria-label="Copy shareable mixtape link"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => {

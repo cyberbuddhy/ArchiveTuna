@@ -33,7 +33,7 @@ import {
 } from "../types";
 import { searchArchive, fetchAlbumDetails, searchArtists } from "../services/api";
 import { fetchAutocompleteSuggestions, computeGhostSuffix } from "../services/autocomplete";
-import { AutocompleteItem, getLocalAutocompleteSuggestions, findMatchingArtistName } from "../data/popularArtists";
+import { AutocompleteItem, getLocalAutocompleteSuggestions, findMatchingArtistName, suggestCorrection } from "../data/popularArtists";
 import {
   getStoredSearchHistory,
   addSearchHistoryItem,
@@ -70,6 +70,14 @@ export const SearchView: React.FC<SearchViewProps> = ({
   const [activeQuery, setActiveQuery] = useState("");
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Tab switched here: focus search so it's ready to type (desktop pointers only)
+  useEffect(() => {
+    if (window.matchMedia?.("(pointer: fine)").matches) {
+      const t = setTimeout(() => inputRef.current?.focus(), 60);
+      return () => clearTimeout(t);
+    }
+  }, []);
 
   // Autocomplete state
   const [suggestions, setSuggestions] = useState<AutocompleteItem[]>([]);
@@ -288,10 +296,12 @@ export const SearchView: React.FC<SearchViewProps> = ({
       }
     }
 
-    // Escape - hide suggestions
+    // Escape - hide suggestions, second press (or no suggestions) releases focus
+    // back to global keybindings (Space/K/J/L/arrows)
     if (e.key === "Escape") {
       setShowSuggestions(false);
       setIsHistoryOpen(false);
+      inputRef.current?.blur();
       return;
     }
   };
@@ -1063,6 +1073,24 @@ export const SearchView: React.FC<SearchViewProps> = ({
               <p className="text-xs text-stone-400">
                 No audio recordings found for "{activeQuery || searchQuery}" on Archive.org.
               </p>
+              {(() => {
+                const fix = suggestCorrection(activeQuery || searchQuery);
+                return fix ? (
+                  <button
+                    onClick={() => {
+                      suppressSuggestionsRef.current = true;
+                      setSearchQuery(fix);
+                      setActiveQuery(fix);
+                      setShowSuggestions(false);
+                      setIsHistoryOpen(false);
+                      executeSearch(fix);
+                    }}
+                    className="mt-1 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-medium hover:bg-amber-500/25 transition-colors cursor-pointer"
+                  >
+                    Did you mean "{fix}"?
+                  </button>
+                ) : null;
+              })()}
               {matchedArtists.length > 0 ? (
                 <p className="text-[11px] text-amber-300/80">
                   However, you can explore the official discography for {matchedArtists[0].name} in the Artist section above!
