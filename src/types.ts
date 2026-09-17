@@ -114,7 +114,7 @@ export interface DiscoveryResponse {
 export interface LibraryDump {
   version: "1.0";
   exportedAt: string;
-  appName: "Archive Music Vault";
+  appName: "ArchiveTuna";
   albums: Album[];
   playlists: Playlist[];
   tierLists?: TierList[];

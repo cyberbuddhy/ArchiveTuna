@@ -35,7 +35,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               <ArchiveLogo className="w-4.5 h-4.5 text-[var(--color-secondary-main)]" />
             </div>
             <span className="font-semibold text-sm tracking-tight text-stone-100 group-hover:text-[var(--color-accent-main)] transition-colors">
-              Archive Tuner
+              ArchiveTuna
+            </span>
+            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/40 text-amber-400">
+              Beta
             </span>
           </div>
 

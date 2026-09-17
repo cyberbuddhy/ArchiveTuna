@@ -201,7 +201,7 @@ export const ArtistDiscographyModal: React.FC<ArtistDiscographyModalProps> = ({
                     }
                   }}
                   className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-stone-800 hover:bg-stone-700/80 text-stone-300 hover:text-amber-300 border border-stone-700/60 hover:border-amber-500/40 flex items-center gap-1 transition-colors cursor-pointer shrink-0"
-                  title={`Search Archive Tuner for artists & albums from ${data.artist.country}`}
+                  title={`Search ArchiveTuna for artists & albums from ${data.artist.country}`}
                 >
                   <Globe2 className="w-3 h-3 text-amber-400/80" />
                   <span>{data.artist.country}</span>

@@ -132,7 +132,7 @@ export function dumpLibraryToFile(): void {
 
   const dump: LibraryDump = {
     version: "1.0",
-    appName: "Archive Music Vault",
+    appName: "ArchiveTuna",
     exportedAt: new Date().toISOString(),
     albums,
     playlists,
@@ -179,7 +179,7 @@ export function parseAndValidateDump(jsonString: string): {
     }
     const validatedDump: LibraryDump = {
       version: parsed.version || "1.0",
-      appName: "Archive Music Vault",
+      appName: "ArchiveTuna",
       exportedAt: parsed.exportedAt || new Date().toISOString(),
       albums: parsed.albums.map((a: any) => ({
         id: a.id || a.identifier || `album_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
