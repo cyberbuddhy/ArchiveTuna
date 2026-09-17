@@ -1,5 +1,5 @@
 import React from "react";
-import { Search, Compass, Disc3 } from "lucide-react";
+import { Search, Compass, Disc3, Settings } from "lucide-react";
 import { ArchiveLogo } from "./ArchiveLogo";
 
 export type NavTabType = "search" | "discover" | "vault";
@@ -8,12 +8,14 @@ interface NavbarProps {
   activeTab: NavTabType;
   setActiveTab: (tab: NavTabType) => void;
   onResetSearch?: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   onResetSearch,
+  onOpenSettings,
 }) => {
   return (
     <header className="sticky top-0 z-30 bg-stone-950/90 backdrop-blur-md border-b border-stone-850/80">
@@ -42,6 +44,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             </span>
           </div>
 
+          {/* Right Section: tabs + settings */}
+          <div className="flex items-center space-x-2">
           {/* 3 Main Section Tabs: Search, Discover, Vault (Desktop only) */}
           <nav aria-label="Main Navigation" className="hidden sm:flex items-center bg-stone-900/90 border border-stone-800 p-0.5 rounded-xl">
             <button
@@ -84,8 +88,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </nav>
 
-          {/* Right Section: Mobile Indicator */}
-          <div className="flex items-center space-x-2">
+          {onOpenSettings && (
+            <button
+              onClick={onOpenSettings}
+              title="Settings, themes & audio"
+              aria-label="Open settings"
+              className="p-2 rounded-xl bg-stone-900/90 border border-stone-800 text-stone-400 hover:text-stone-100 hover:border-stone-700 transition-colors cursor-pointer"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Mobile active-tab indicator */}
+          <div className="flex items-center space-x-2 sm:hidden">
             <span
               className={`sm:hidden text-[11px] font-semibold uppercase tracking-wider px-2 py-1 rounded-lg text-center min-w-[68px] inline-block ${
                 activeTab === "search"
@@ -97,6 +112,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               {activeTab === "search" ? "Search" : activeTab === "discover" ? "Discover" : "Vault"}
             </span>
+          </div>
           </div>
         </div>
       </div>

@@ -23,7 +23,7 @@ import {
   getStoredHistory,
 } from "./services/storage";
 import { Album, Playlist, Track, ListenHistoryItem, TierList } from "./types";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Heart } from "lucide-react";
 import { ArchiveLogo } from "./components/ArchiveLogo";
 import { THEMES, getStoredThemeId, saveThemeId, applyThemeToDOM } from "./services/themes";
 
@@ -80,6 +80,7 @@ export default function App() {
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [detailAlbum, setDetailAlbum] = useState<Album | null>(null);
+  const [sharedMix, setSharedMix] = useState<{ name: string; tracks: Track[] } | null>(null);
   const [discographyArtist, setDiscographyArtist] = useState<string | null>(null);
   const [externalSearchQuery, setExternalSearchQuery] = useState<{ query: string; field?: string } | null>(null);
 
@@ -209,15 +210,105 @@ export default function App() {
     setHistory(loadedHistory);
   }, []);
 
-  // Sync history periodically or on window focus
+  // Shared links (#a= album, #s= song, #p= playlist, legacy #mix=)
+  useEffect(() => {
+    (async () => {
+      try {
+        const { parseSharedHash } = await import("./services/share");
+        const open = await parseSharedHash();
+        if (!open) return;
+        window.history.replaceState(null, "", location.pathname + location.search);
+        if (open.kind === "song") {
+          window.dispatchEvent(new CustomEvent("archive_play_song", {
+            detail: { albumId: open.albumId, track: open.track },
+          }));
+          return;
+        }
+        if (open.kind === "album") {
+          try {
+            const full = await fetchAlbumDetails(open.id);
+            setSharedMix(null);
+            handleSelectAlbumForDetail(full);
+          } catch {
+            showToast("Shared album couldn't be loaded.", "info");
+          }
+          return;
+        }
+        if (open.kind === "playlist") {
+          const settled = await Promise.all(open.refs.map(async ([id, n]) => {
+            try {
+              const a = await fetchAlbumDetails(id);
+              const t = a.tracks.find((x) => x.trackNumber === n) || a.tracks[n - 1];
+              return t ? { ...t, album: open.name } : null;
+            } catch {
+              return null;
+            }
+          }));
+          const tracks = settled.filter((t): t is Track => !!t);
+          if (!tracks.length) {
+            showToast("Shared playlist couldn't be loaded.", "info");
+            return;
+          }
+          openSharedPlaylist(open.name, tracks);
+          return;
+        }
+        // legacy full-data link
+        if (open.tracks.length) openSharedPlaylist(open.name, open.tracks);
+      } catch { /* noop */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const openSharedPlaylist = (name: string, tracks: Track[]) => {
+    const first = tracks[0];
+    const album: Album = {
+      id: `shared_${Date.now()}`,
+      identifier: `shared_${Date.now()}`,
+      title: name,
+      artist: "Shared mixtape",
+      coverUrl: `https://archive.org/services/img/${first.albumId}`,
+      collection: "Shared Mixtape",
+      tracks: tracks.map((t, i) => ({ ...t, trackNumber: i + 1, album: name })),
+      source: "Shared link",
+      capturedAt: new Date().toISOString(),
+    };
+    setSharedMix({ name, tracks: album.tracks });
+    setDetailAlbum(album);
+    setActiveTabState(getTabFromHash());
+  };
+
+  const handleSaveSharedMix = useCallback(() => {
+    if (!sharedMix) return;
+    setPlaylists((prev) => {
+      if (prev.some((p) => p.name === sharedMix.name && p.tracks.length === sharedMix.tracks.length)) {
+        showToast("Already in your vault.", "info");
+        return prev;
+      }
+      const pl: Playlist = {
+        id: `pl_${Date.now()}`, name: sharedMix.name,
+        description: "Saved from a shared link",
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+        tracks: sharedMix.tracks,
+      };
+      const updated = [...prev, pl];
+      saveStoredPlaylists(updated);
+      showToast(`Saved "${sharedMix.name}" to your vault!`);
+      return updated;
+    });
+  }, [sharedMix]);
   useEffect(() => {
     const syncHistory = () => {
       setHistory(getStoredHistory());
     };
+    const onTrackError = (e: Event) => {
+      showToast((e as CustomEvent<string>).detail || "Track unavailable — skipped ahead.", "info");
+    };
     window.addEventListener("focus", syncHistory);
+    window.addEventListener("archive_track_error", onTrackError);
     const interval = setInterval(syncHistory, 5000);
     return () => {
       window.removeEventListener("focus", syncHistory);
+      window.removeEventListener("archive_track_error", onTrackError);
       clearInterval(interval);
     };
   }, []);
@@ -361,6 +452,7 @@ export default function App() {
       return updated;
     });
     showToast(`Playlist "${name}" created!`);
+    return newPlaylist;
   }, []);
 
   const handleDeletePlaylist = useCallback((playlistId: string) => {
@@ -461,6 +553,7 @@ export default function App() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           onResetSearch={handleResetToSearch}
+          onOpenSettings={() => setIsSettingsModalOpen(true)}
         />
 
         {/* Global Toast Notification */}
@@ -533,6 +626,16 @@ export default function App() {
               <p className="text-[11px] text-stone-500 max-w-sm mx-auto leading-relaxed">
                 Stream millions of live concerts, tapers soundboards, 78 RPM recordings, and indie masters on Archive.org.
               </p>
+              <a
+                href="https://github.com/sponsors/cyberbuddhy"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center space-x-1.5 mt-1 px-3 py-1.5 rounded-xl bg-stone-900 border border-stone-800 hover:border-rose-500/50 text-[11px] font-medium text-stone-400 hover:text-rose-400 transition-colors"
+                title="Support ArchiveTuna development"
+              >
+                <Heart className="w-3.5 h-3.5" />
+                <span>Sponsor ArchiveTuna</span>
+              </a>
             </div>
           </div>
         </footer>
@@ -580,7 +683,7 @@ export default function App() {
         <AlbumDetailModal
           album={detailAlbum}
           isOpen={!!detailAlbum}
-          onClose={() => setDetailAlbum(null)}
+          onClose={() => { setDetailAlbum(null); setSharedMix(null); }}
           onUpdateAlbum={handleUpdateAlbum}
           onDeleteAlbum={handleDeleteAlbum}
           playlists={playlists}
@@ -589,6 +692,7 @@ export default function App() {
           tierLists={tierLists}
           onUpdateTierList={handleUpdateTierList}
           onCreateTierList={handleCreateTierList}
+          vaultAction={sharedMix ? { label: "Add playlist to my vault", onAction: handleSaveSharedMix } : undefined}
         />
 
         {/* Global Artist Discography Modal */}

@@ -19,6 +19,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { downloadAlbumZip, downloadTrackAudio } from "../utils/download";
+import { linkForAlbum, linkForSong } from "../services/share";
 import { Album, Track, Playlist, TierRank, TierList, TierItem } from "../types";
 import { usePlayer } from "../context/PlayerContext";
 import { TIER_RANKS, TIER_CONFIG } from "../utils/tierList";
@@ -32,11 +33,12 @@ interface AlbumDetailModalProps {
   onDeleteAlbum?: (albumId: string) => void;
   playlists: Playlist[];
   onAddTrackToPlaylist: (playlistId: string, track: Track) => void;
-  onCreatePlaylist?: (name: string, description?: string) => void;
+  onCreatePlaylist?: (name: string, description?: string) => Playlist | void;
   onOpenArtistDiscography?: (artistName: string) => void;
   tierLists?: TierList[];
   onUpdateTierList?: (tierList: TierList) => void;
   onCreateTierList?: (name: string, description?: string) => TierList | void;
+  vaultAction?: { label: string; onAction: () => void };
 }
 
 export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
@@ -52,13 +54,25 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   tierLists = [],
   onUpdateTierList,
   onCreateTierList,
+  vaultAction,
 }) => {
   const { playTrack, playAlbum, currentTrack, isPlaying } = usePlayer();
   const [activeTab, setActiveTab] = useState<"tracks" | "notes">("tracks");
   const [noteText, setNoteText] = useState(album?.userNotes || "");
   const [tagInput, setTagInput] = useState("");
   const [playlistMenuTrackId, setPlaylistMenuTrackId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [newSingleName, setNewSingleName] = useState("");
   const [isAddAllPlaylistOpen, setIsAddAllPlaylistOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const copyLink = async (url: string) => {
+    try {
+      await navigator.clipboard?.writeText(url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 1500);
+    } catch { /* clipboard unavailable */ }
+  };
   const [isCreatingNewPlaylistInline, setIsCreatingNewPlaylistInline] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [addedFeedback, setAddedFeedback] = useState<string | null>(null);
@@ -223,10 +237,11 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
       <div
         id="album-detail-modal"
         className="w-full max-w-3xl bg-stone-900 border border-stone-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header / Hero */}
         <div className="relative p-6 bg-gradient-to-b from-stone-850 to-stone-900 border-b border-stone-800">
@@ -577,24 +592,46 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 )}
+                <button
+                  onClick={() => copyLink(linkForAlbum(album.identifier || album.id))}
+                  className="p-1 rounded text-stone-500 hover:text-amber-400 hover:bg-stone-800 transition-colors cursor-pointer"
+                  title="Copy shareable album link"
+                  aria-label="Copy shareable album link"
+                >
+                  {linkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
+                </button>
               </div>
 
               {/* Action Buttons: Play All, Add All to Playlist, Download ZIP */}
               <div className="pt-2 flex flex-wrap items-center gap-2.5">
                 <button
                   id="play-entire-album-btn"
-                  onClick={() => playAlbum(album, 0)}
+                  onClick={() => { playAlbum(album, 0); onClose(); }}
                   className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-stone-950 font-semibold text-xs rounded-xl transition-colors flex items-center space-x-2 shadow-md cursor-pointer"
                 >
                   <Play className="w-4 h-4 fill-stone-950" />
                   <span>Play All Tracks ({album.tracks?.length || 0})</span>
                 </button>
 
-                {/* Add All to Playlist dropdown */}
+                {/* Shared-mixtape vault action replaces Add All to Playlist */}
+                {vaultAction ? (
+                  <button
+                    onClick={vaultAction.onAction}
+                    className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-stone-950 font-semibold text-xs rounded-xl transition-colors flex items-center space-x-1.5 cursor-pointer shadow-sm"
+                    title="Save this shared playlist to your vault"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{vaultAction.label}</span>
+                  </button>
+                ) : (
                 <div className="relative">
                   <button
                     id="add-all-songs-to-playlist-btn"
-                    onClick={() => setIsAddAllPlaylistOpen(!isAddAllPlaylistOpen)}
+                    onClick={() => {
+                      setPlaylistMenuTrackId(null);
+                      setMenuPos(null);
+                      setIsAddAllPlaylistOpen(!isAddAllPlaylistOpen);
+                    }}
                     className="px-3 py-2 bg-stone-850 hover:bg-stone-800 text-stone-200 hover:text-amber-400 font-medium text-xs rounded-xl border border-stone-750 transition-colors flex items-center space-x-1.5 cursor-pointer shadow-sm"
                     title="Add all songs in this album to a playlist"
                   >
@@ -685,6 +722,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                     </div>
                   )}
                 </div>
+                )}
 
                 {/* Offline Cache: Pin Entire Album */}
                 {album.tracks && album.tracks.length > 0 && (
@@ -806,7 +844,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                     >
                       <div className="flex items-center space-x-3 min-w-0 flex-1">
                         <button
-                          onClick={() => playTrack(track, album, album.tracks)}
+                          onClick={() => { playTrack(track, album, album.tracks); onClose(); }}
                           className="w-7 h-7 rounded-lg bg-stone-800 group-hover:bg-amber-500 group-hover:text-stone-950 text-stone-300 flex items-center justify-center shrink-0 transition-colors"
                         >
                           {isCurrent && isPlaying ? (
@@ -866,43 +904,104 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                           </button>
                         )}
 
-                        {/* Add to Playlist Popup */}
-                        <div className="relative">
+                        <button
+                          onClick={() => copyLink(linkForSong(album.identifier || album.id, track.trackNumber || idx + 1))}
+                          className="p-1 rounded text-stone-500 hover:text-amber-400 hover:bg-stone-800 transition-colors cursor-pointer"
+                          title="Copy shareable song link"
+                          aria-label="Copy shareable song link"
+                        >
+                          {linkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
+                        </button>
+
+                        {/* Add to Playlist Popup (viewport-anchored, never clipped) */}
+                        <div>
                           <button
-                            onClick={() =>
-                              setPlaylistMenuTrackId(
-                                playlistMenuTrackId === track.id ? null : track.id
-                              )
-                            }
+                            onClick={(e) => {
+                              if (playlistMenuTrackId === track.id) {
+                                setPlaylistMenuTrackId(null);
+                                setMenuPos(null);
+                                return;
+                              }
+                              setIsAddAllPlaylistOpen(false);
+                              const r = e.currentTarget.getBoundingClientRect();
+                              const w = 224;
+                              setMenuPos({
+                                top: Math.max(8, Math.min(r.bottom + 6, window.innerHeight - 240)),
+                                left: Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)),
+                              });
+                              setPlaylistMenuTrackId(track.id);
+                              setNewSingleName("");
+                            }}
                             className="p-1 rounded text-stone-500 hover:text-stone-200 hover:bg-stone-800"
                             title="Add track to playlist"
+                            aria-label="Add track to playlist"
                           >
                             <Plus className="w-4 h-4" />
                           </button>
 
-                          {playlistMenuTrackId === track.id && (
-                            <div className="absolute right-0 bottom-full mb-1 w-44 bg-stone-950 border border-stone-800 rounded-xl shadow-xl p-1.5 z-30 space-y-1">
-                              <p className="text-[10px] text-stone-400 px-2 py-0.5 font-medium uppercase">
-                                Add to Playlist
-                              </p>
-                              {playlists.length === 0 ? (
-                                <p className="text-[11px] text-stone-500 px-2 py-1">No playlists yet</p>
-                              ) : (
-                                playlists.map((pl) => (
-                                  <button
-                                    key={pl.id}
-                                    onClick={() => {
-                                      onAddTrackToPlaylist(pl.id, track);
+                          {playlistMenuTrackId === track.id && menuPos && (
+                            <>
+                              <div className="fixed inset-0 z-40" onClick={() => { setPlaylistMenuTrackId(null); setMenuPos(null); }} />
+                              <div
+                                className="fixed z-50 w-56 bg-stone-950 border border-stone-800 rounded-xl shadow-2xl p-2 space-y-1.5"
+                                style={{ top: menuPos.top, left: menuPos.left }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <p className="text-[10px] text-stone-400 px-2 py-0.5 font-medium uppercase">
+                                  Add to Playlist
+                                </p>
+                                <div className="max-h-44 overflow-y-auto space-y-1">
+                                  {playlists.length === 0 ? (
+                                    <p className="text-[11px] text-stone-500 px-2 py-1">No playlists yet — create one below</p>
+                                  ) : (
+                                    playlists.map((pl) => (
+                                      <button
+                                        key={pl.id}
+                                        onClick={() => {
+                                          onAddTrackToPlaylist(pl.id, track);
+                                          setPlaylistMenuTrackId(null);
+                                          setMenuPos(null);
+                                        }}
+                                        className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-stone-900 text-stone-200 hover:text-amber-400 flex items-center justify-between gap-2 cursor-pointer transition-colors"
+                                      >
+                                        <span className="truncate font-medium text-xs">{pl.name}</span>
+                                        <Plus className="w-3 h-3 text-amber-400 shrink-0" />
+                                      </button>
+                                    ))
+                                  )}
+                                </div>
+                                <form
+                                  onSubmit={(ev) => {
+                                    ev.preventDefault();
+                                    const name = newSingleName.trim();
+                                    if (!name) return;
+                                    const created = onCreatePlaylist?.(name) as Playlist | void;
+                                    const id = created && typeof created === "object" ? created.id : playlists.find((p) => p.name === name)?.id;
+                                    if (id) {
+                                      onAddTrackToPlaylist(id, track);
                                       setPlaylistMenuTrackId(null);
-                                    }}
-                                    className="w-full text-left px-2 py-1.5 rounded text-xs text-stone-300 hover:bg-stone-800 flex items-center justify-between"
+                                      setMenuPos(null);
+                                    }
+                                  }}
+                                  className="flex items-center gap-1.5 pt-1 border-t border-stone-800/80"
+                                >
+                                  <input
+                                    value={newSingleName}
+                                    onChange={(e) => setNewSingleName(e.target.value)}
+                                    placeholder="New playlist…"
+                                    maxLength={40}
+                                    className="flex-1 min-w-0 px-2 py-1.5 bg-stone-900 border border-stone-800 rounded-lg text-xs text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500"
+                                  />
+                                  <button
+                                    type="submit"
+                                    disabled={!newSingleName.trim()}
+                                    className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-stone-950 text-xs font-bold rounded-lg cursor-pointer shrink-0"
                                   >
-                                    <span className="truncate">{pl.name}</span>
-                                    <Plus className="w-3 h-3 text-amber-400" />
+                                    Add
                                   </button>
-                                ))
-                              )}
-                            </div>
+                                </form>
+                              </div>
+                            </>
                           )}
                         </div>
                       </div>

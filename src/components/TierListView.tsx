@@ -547,8 +547,8 @@ export const TierListView: React.FC<TierListViewProps> = ({
 
       {/* MODAL: ADD ALBUM TO TIER LIST */}
       {isAddAlbumOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md bg-stone-900 border border-stone-800 rounded-2xl shadow-2xl p-5 space-y-4 animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setIsAddAlbumOpen(false)}>
+          <div className="w-full max-w-md bg-stone-900 border border-stone-800 rounded-2xl shadow-2xl p-5 space-y-4 animate-in fade-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-stone-100">Add Album to Tier List</h3>
               <button

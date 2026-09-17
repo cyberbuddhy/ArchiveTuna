@@ -255,6 +255,45 @@ export function getLocalAutocompleteSuggestions(
 }
 
 /**
+ * Fuzzy "did you mean" suggestion: closest popular name within ~30% edit distance.
+ */
+function levenshtein(a: string, b: string): number {
+  const dp: number[][] = Array.from({ length: a.length + 1 }, (_, i) => {
+    const row = new Array(b.length + 1).fill(0);
+    row[0] = i;
+    return row;
+  });
+  for (let j = 1; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+export function suggestCorrection(query: string): string | null {
+  const clean = query.trim().toLowerCase();
+  if (clean.length < 3) return null;
+  let best: string | null = null;
+  let bestD = Infinity;
+  for (const item of POPULAR_SUGGESTIONS) {
+    const name = item.name.toLowerCase();
+    if (name === clean || name.includes(clean) || clean.includes(name)) return null;
+    const d = levenshtein(clean, name);
+    if (d <= Math.max(1, Math.floor(name.length * 0.3)) && d < bestD) {
+      bestD = d;
+      best = item.name;
+    }
+  }
+  return best;
+}
+
+/**
  * Checks if a search query strongly matches a known artist or band name
  */
 export function findMatchingArtistName(query: string): string | null {

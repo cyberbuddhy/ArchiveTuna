@@ -21,7 +21,9 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
         { key: "2", label: "Discover & AI Recommendations" },
         { key: "3", label: "My Music Vault & Playlists" },
         { key: "/", label: "Jump to Search Input from anywhere" },
-        { key: "Esc", label: "Close active modal or overlay" },
+        { key: "Esc", label: "Close modal / unfocus search (keybindings work when search is unfocused)" },
+        { key: "↑ / ↓ in search", label: "Move through suggestions" },
+        { key: "Enter in search", label: "Open top suggestion / run search" },
       ],
     },
     {
