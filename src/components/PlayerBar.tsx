@@ -476,7 +476,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
               <button
                 onClick={togglePlay}
                 disabled={isLoading}
-                className="w-16 h-16 rounded-full bg-amber-500 text-stone-950 flex items-center justify-center shadow-[0_0_25px_rgba(245,158,11,0.4)] active:scale-95 transition-transform cursor-pointer"
+                className="w-16 h-16 rounded-full bg-[var(--color-accent-main)] text-stone-950 flex items-center justify-center shadow-[0_0_25px_-5px_var(--color-accent-main)] active:scale-95 transition-transform cursor-pointer"
                 title={isPlaying ? "Pause" : "Play"}
               >
                 {isLoading ? (
@@ -656,7 +656,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
             <button
               onClick={togglePlay}
               disabled={isLoading}
-              className="w-9 h-9 rounded-full bg-amber-500 hover:bg-amber-400 text-stone-950 flex items-center justify-center shadow-md active:scale-95 transition-transform cursor-pointer"
+              className="w-9 h-9 rounded-full bg-[var(--color-accent-main)] hover:bg-[var(--color-accent-light)] text-stone-950 flex items-center justify-center shadow-md active:scale-95 transition-transform cursor-pointer"
               title={isPlaying ? "Pause" : "Play"}
             >
               {isLoading ? (
