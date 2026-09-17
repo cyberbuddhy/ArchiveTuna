@@ -4,6 +4,7 @@ import { recordListen } from "../services/storage";
 import { getStoredPlayerSettings, savePlayerSettings, PlayerSettings } from "../services/playerSettings";
 import { audioEngine } from "../services/audioEngine";
 import { offlineCache } from "../services/offlineCache";
+import { readSharedMix } from "../services/share";
 
 export type RepeatMode = "off" | "all" | "one";
 
@@ -39,6 +40,8 @@ interface PlayerContextType {
   nextTrack: () => void;
   prevTrack: () => void;
   addToQueue: (track: Track) => void;
+  appendToQueue: (tracks: Track[]) => void;
+  getAudioElement: () => HTMLAudioElement | null;
   removeFromQueue: (index: number) => void;
   clearQueue: () => void;
 }
@@ -63,6 +66,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const recordedRef = useRef<boolean>(false);
+  const prefetchedRef = useRef<string | null>(null);
   const currentBlobUrlRef = useRef<string | null>(null);
 
   // Offline caching status
@@ -234,6 +238,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     const audio = new Audio();
     audio.preload = "auto";
+    audio.crossOrigin = "anonymous";
     audioRef.current = audio;
 
     let lastTimeUpdate = 0;
@@ -312,6 +317,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     recordedRef.current = false;
+    prefetchedRef.current = null;
     setCurrentTrack(track);
     if (album) setCurrentAlbum(album);
     setCurrentTime(0);
@@ -544,6 +550,29 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setQueue((prev) => [...prev, track]);
   };
 
+  const appendToQueue = (tracks: Track[]) => {
+    const clean = (tracks || []).filter(Boolean);
+    if (!clean.length) return;
+    setQueue((prev) => {
+      const ids = new Set(prev.map((t) => t?.id));
+      return [...prev, ...clean.filter((t) => !ids.has(t.id))];
+    });
+  };
+
+  const getAudioElement = () => audioRef.current;
+
+  // Prefetch next track at 80% / 15s remaining for zero-gap
+  useEffect(() => {
+    if (!currentTrack || !duration) return;
+    const remain = duration - currentTime;
+    const next = queue[queueIndex + 1];
+    if (!next || prefetchedRef.current === next.id) return;
+    if (remain < 15 || currentTime / duration > 0.8) {
+      prefetchedRef.current = next.id;
+      try { fetch(next.streamUrl, { mode: "no-cors" }).catch(() => {}); } catch { /* noop */ }
+    }
+  }, [currentTime, duration, queue, queueIndex, currentTrack]);
+
   const removeFromQueue = (index: number) => {
     setQueue((prev) => {
       const updated = prev.filter((_, i) => i !== index);
@@ -567,6 +596,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setQueueIndex(0);
     }
   };
+
+  // Shared mixtape deep-link (#mix=...) -> queue instantly, zero auth
+  useEffect(() => {
+    try {
+      const shared = readSharedMix();
+      if (shared && shared.length) {
+        setQueue(shared);
+        setQueueIndex(0);
+        loadAndPlay(shared[0]);
+        history.replaceState(null, "", location.pathname + location.search);
+      }
+    } catch { /* noop */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // MediaSession API integration (fully guarded for iframes and varied browsers)
   useEffect(() => {
@@ -702,6 +745,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         nextTrack,
         prevTrack,
         addToQueue,
+        appendToQueue,
+        getAudioElement,
         removeFromQueue,
         clearQueue,
       }}
