@@ -272,18 +272,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const handleEnded = () => handleAutoAdvance();
 
     const handleError = () => {
-      const { currentTrack: track } = stateRef.current;
+      // Static build: no server proxy — direct archive.org streams only
       setIsLoading(false);
-      // Attempt proxy fallback once if direct stream failed and not already proxying
-      if (track?.streamUrl && audio.src && !audio.src.includes("/api/audio-proxy")) {
-        const proxyUrl = `/api/audio-proxy?url=${encodeURIComponent(track.streamUrl)}`;
-        audio.src = proxyUrl;
-        audio.play().catch(() => {
-          setIsPlaying(false);
-        });
-      } else {
-        setIsPlaying(false);
-      }
+      setIsPlaying(false);
     };
 
     audio.addEventListener("timeupdate", handleTimeUpdate);
@@ -364,27 +355,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         .catch((err) => {
           // If aborted by a new play request, ignore
           if (err.name === "AbortError") return;
-
-          // Try proxy fallback only if online stream failed
-          if (!playbackSrc.startsWith("blob:") && track.streamUrl && !track.streamUrl.includes("/api/audio-proxy")) {
-            audio.src = `/api/audio-proxy?url=${encodeURIComponent(track.streamUrl)}`;
-            audio.playbackRate = playbackRate;
-            audio.volume = targetVol;
-            audio
-              .play()
-              .then(() => {
-                setIsPlaying(true);
-                setIsLoading(false);
-                audio.volume = targetVol;
-              })
-              .catch(() => {
-                setIsLoading(false);
-                setIsPlaying(false);
-              });
-          } else {
-            setIsLoading(false);
-            setIsPlaying(false);
-          }
+          // Static build: no server proxy to fall back to
+          setIsLoading(false);
+          setIsPlaying(false);
         });
     } catch (err) {
       console.warn("Audio playback init error:", err);
