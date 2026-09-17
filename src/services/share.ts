@@ -28,13 +28,16 @@ function b64urlDecode(s: string): Uint8Array {
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
-async function gzip(raw: string): Promise<Uint8Array> {
-  const cs = new CompressionStream("gzip");
-  const w = cs.writable.getWriter();
-  w.write(new TextEncoder().encode(raw));
-  w.close();
+async function pump(stream: CompressionStream | DecompressionStream, input: Uint8Array): Promise<Uint8Array> {
+  const w = stream.writable.getWriter();
+  try {
+    await w.write(input as unknown as Uint8Array<ArrayBuffer>);
+  } catch { /* decode will fail below, handled by callers */ }
+  try {
+    await w.close();
+  } catch { /* noop */ }
   const chunks: Uint8Array[] = [];
-  const r = cs.readable.getReader();
+  const r = stream.readable.getReader();
   for (;;) {
     const { done, value } = await r.read();
     if (done) break;
@@ -46,23 +49,11 @@ async function gzip(raw: string): Promise<Uint8Array> {
   chunks.forEach((c) => { out.set(c, o); o += c.length; });
   return out;
 }
+async function gzip(raw: string): Promise<Uint8Array> {
+  return pump(new CompressionStream("gzip"), new TextEncoder().encode(raw));
+}
 async function gunzip(bytes: Uint8Array): Promise<string> {
-  const ds = new DecompressionStream("gzip");
-  const w = ds.writable.getWriter();
-  w.write(bytes as unknown as Uint8Array<ArrayBuffer>);
-  w.close();
-  const chunks: Uint8Array[] = [];
-  const r = ds.readable.getReader();
-  for (;;) {
-    const { done, value } = await r.read();
-    if (done) break;
-    chunks.push(value);
-  }
-  const total = chunks.reduce((a, c) => a + c.length, 0);
-  const out = new Uint8Array(total);
-  let o = 0;
-  chunks.forEach((c) => { out.set(c, o); o += c.length; });
-  return new TextDecoder().decode(out);
+  return new TextDecoder().decode(await pump(new DecompressionStream("gzip"), bytes));
 }
 
 export interface SharedMix {
