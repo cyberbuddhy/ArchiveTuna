@@ -42,6 +42,7 @@ import {
 } from "../services/storage";
 import { usePlayer } from "../context/PlayerContext";
 import { ArchiveLogo } from "./ArchiveLogo";
+import { TabHeader } from "./TabHeader";
 import { TIER_CONFIG } from "../utils/tierList";
 
 interface SearchViewProps {
@@ -551,7 +552,16 @@ export const SearchView: React.FC<SearchViewProps> = ({
   return (
     <div className="space-y-6 pb-12">
       {/* SEARCH HEADER: Input Bar with Autocomplete + "+" Advanced Search Button */}
-      <div className="max-w-4xl mx-auto space-y-3 pt-2">
+      <div className="max-w-4xl mx-auto space-y-3">
+        <TabHeader
+          icon={<Search className="w-4 h-4" />}
+          title="Search the archives"
+          subtitle={
+            hasSearched && activeQuery
+              ? `${results.length} recordings for "${activeQuery}"`
+              : "Live concerts, 78 RPM masters & netlabel releases"
+          }
+        />
         <div ref={searchContainerRef} className="relative">
           <form onSubmit={handleSearchSubmit} className="relative shadow-lg rounded-2xl">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-stone-400 z-20">

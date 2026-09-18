@@ -294,6 +294,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (audio.currentTime > 6 && !recordedRef.current && track) {
         recordListen(track, album || undefined);
         recordedRef.current = true;
+        // Optional auto-download: played streams stay in offline cache
+        try {
+          const s = getStoredPlayerSettings();
+          const url = track.streamUrl || "";
+          const isRemote = url.startsWith("http://") || url.startsWith("https://");
+          if (s.autoCachePlayed && isRemote && !offlineCache.isTrackCachedSync(track.id) && !offlineCache.isTrackDownloading(track.id)) {
+            void offlineCache.cacheTrack(track, album || undefined).catch(() => {});
+          }
+        } catch { /* settings/cache optional — never break playback */ }
       }
     };
 

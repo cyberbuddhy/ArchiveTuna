@@ -26,6 +26,9 @@ export interface PlayerSettings {
   stereoPan?: number;
   radioInfinite?: boolean;
 
+  // Offline: pin every played stream automatically (off by default)
+  autoCachePlayed?: boolean;
+
   // Saved EQ profiles
   eqProfiles: EqProfile[];
   activeEqProfile: string;
@@ -61,6 +64,7 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
   preamp: 1,
   stereoPan: 0,
   radioInfinite: false,
+  autoCachePlayed: false,
   eqProfiles: FACTORY_EQ_PROFILES.map((p) => ({ ...p, eq: [...p.eq] })),
   activeEqProfile: "Flat",
 };

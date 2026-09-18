@@ -577,6 +577,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     />
                   </button>
                 </div>
+
+                {/* Auto-save played tracks to offline cache */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-stone-950/40 border border-stone-850">
+                  <div className="space-y-0.5">
+                    <div className="font-medium text-stone-200 flex items-center space-x-1.5">
+                      <Database className="w-3.5 h-3.5 text-stone-400" />
+                      <span>Auto-save played tracks</span>
+                    </div>
+                    <div className="text-[11px] text-stone-400">
+                      Pin every played stream to offline cache automatically — played songs stay available offline
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleUpdate({ autoCachePlayed: !settings.autoCachePlayed })}
+                    className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+                      settings.autoCachePlayed ? "bg-amber-500" : "bg-stone-800"
+                    }`}
+                  >
+                    <span
+                      className={`block w-4 h-4 rounded-full bg-stone-950 transition-transform ${
+                        settings.autoCachePlayed ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
 
               {/* 5. Graphic Equalizer + Saved Profiles */}
