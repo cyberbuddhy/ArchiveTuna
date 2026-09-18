@@ -23,6 +23,7 @@ import { GENRE_HIERARCHY, GenreNode } from "../data/genreHierarchy";
 import { Album, SearchCollectionType, SearchEraType } from "../types";
 import { searchArchive, fetchAlbumDetails } from "../services/api";
 import { usePlayer } from "../context/PlayerContext";
+import { TabHeader } from "./TabHeader";
 
 interface DiscoverViewProps {
   onCaptureAlbum: (album: Album) => void;
@@ -281,75 +282,57 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
       {/* 1. SPACE-SAVING GENRE DISCOVERY DROPDOWN HEADER */}
       {/* ========================================================================= */}
       <div className="relative">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 sm:p-3.5 bg-stone-900/90 hover:bg-stone-850/80 border border-stone-800 rounded-2xl transition-all shadow-sm">
-          {/* Dropdown trigger button */}
-          <button
-            id="genre-discovery-dropdown-trigger"
-            type="button"
-            onClick={() => setIsGenreDropdownOpen(!isGenreDropdownOpen)}
-            className="flex items-center space-x-3 text-left flex-1 cursor-pointer select-none group min-w-0"
-          >
-            <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform shrink-0">
-              <Disc3 className="w-4 h-4" />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center space-x-2">
-                <h2 className="text-xs sm:text-sm font-bold text-stone-100 group-hover:text-[var(--color-secondary-light)] transition-colors">
-                  Genre Discovery
-                </h2>
+        <TabHeader
+          icon={<Disc3 className="w-4 h-4" />}
+          title="Genre Discovery"
+          titleId="genre-discovery-dropdown-trigger"
+          onTitleClick={() => setIsGenreDropdownOpen(!isGenreDropdownOpen)}
+          titleExtra={
+            <ChevronDown
+              className={`w-4 h-4 text-amber-400 transition-transform duration-200 shrink-0 ${
+                isGenreDropdownOpen ? "rotate-180" : ""
+              }`}
+            />
+          }
+          subtitle={
+            genrePath.length > 0 ? (
+              <span className="text-amber-300 font-medium">
+                Active: {genrePath.map((n) => n.name).join(" → ")}
+              </span>
+            ) : (
+              "Select a genre from the dropdown to display archival classics"
+            )
+          }
+          actions={
+            <>
+              {genrePath.length > 0 && (
+                <button
+                  id="btn-clear-genre-selection"
+                  type="button"
+                  onClick={() => handleJumpToBreadcrumb(-1)}
+                  className="px-3 py-2 text-xs text-stone-400 hover:text-stone-200 bg-stone-950 border border-stone-800 hover:border-stone-700 rounded-xl transition-colors flex items-center space-x-1.5 cursor-pointer"
+                  title="Clear selected genre"
+                >
+                  <X className="w-3.5 h-3.5 text-stone-500" />
+                  <span>Clear Genre</span>
+                </button>
+              )}
+              <button
+                id="btn-toggle-genre-dropdown"
+                type="button"
+                onClick={() => setIsGenreDropdownOpen(!isGenreDropdownOpen)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 cursor-pointer bg-stone-950 hover:bg-stone-850 text-stone-300 border border-stone-800"
+              >
+                <span>{isGenreDropdownOpen ? "Hide Genres" : "Browse Genres"}</span>
                 <ChevronDown
-                  className={`w-4 h-4 text-[var(--color-secondary-main)] transition-transform duration-200 ${
+                  className={`w-3.5 h-3.5 transition-transform duration-200 ${
                     isGenreDropdownOpen ? "rotate-180" : ""
                   }`}
                 />
-              </div>
-              <p className="text-[11px] text-stone-400 truncate mt-0.5">
-                {genrePath.length > 0 ? (
-                  <span className="text-[var(--color-secondary-light)] font-medium">
-                    Active: {genrePath.map((n) => n.name).join(" → ")}
-                  </span>
-                ) : (
-                  "Select a genre from the dropdown to display archival classics"
-                )}
-              </p>
-            </div>
-          </button>
-
-          {/* Action pills: Clear genre selection & Browse dropdown button */}
-          <div className="flex items-center space-x-2 shrink-0 self-end sm:self-auto">
-            {genrePath.length > 0 && (
-              <button
-                id="btn-clear-genre-selection"
-                type="button"
-                onClick={() => handleJumpToBreadcrumb(-1)}
-                className="px-2.5 py-1.5 text-xs text-stone-400 hover:text-stone-200 bg-stone-950 border border-stone-800 hover:border-stone-700 rounded-xl transition-colors flex items-center space-x-1.5 cursor-pointer"
-                title="Clear selected genre"
-              >
-                <X className="w-3.5 h-3.5 text-stone-500" />
-                <span>Clear Genre</span>
               </button>
-            )}
-
-            <button
-              id="btn-toggle-genre-dropdown"
-              type="button"
-              onClick={() => setIsGenreDropdownOpen(!isGenreDropdownOpen)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 cursor-pointer ${
-                isGenreDropdownOpen
-                  ? "bg-[var(--color-secondary-main)] text-stone-950 shadow"
-                  : "bg-stone-950 hover:bg-stone-850 text-stone-300 border border-stone-800"
-              }`}
-            >
-              <span>{isGenreDropdownOpen ? "Hide Genres" : "Browse Genres"}</span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                  isGenreDropdownOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-          </div>
-        </div>
+            </>
+          }
+        />
 
         {/* ========================================================================= */}
         {/* DROPDOWN MENU / PANEL (Browse primary genres or search all genres) */}

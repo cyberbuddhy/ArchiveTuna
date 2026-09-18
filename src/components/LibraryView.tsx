@@ -22,12 +22,17 @@ import {
   Shuffle,
   Database,
   Share2,
+  History,
 } from "lucide-react";
-import { Album, Track, Playlist, TierList } from "../types";
+import { Album, Track, Playlist, TierList, ListenHistoryItem } from "../types";
+import { getStoredHistory } from "../services/storage";
+import { fetchAlbumDetails } from "../services/api";
 import { usePlayer } from "../context/PlayerContext";
 import { linkForPlaylist } from "../services/share";
 import { downloadAlbumZip, downloadTrackAudio } from "../utils/download";
 import { TierListView } from "./TierListView";
+import { LocalLibraryTab } from "./LocalLibraryTab";
+import { TabHeader } from "./TabHeader";
 import { TIER_CONFIG } from "../utils/tierList";
 import { offlineCache, CachedAudioItem } from "../services/offlineCache";
 import { formatTime } from "../utils/format";
@@ -103,12 +108,18 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     "albums" | "offline" | "liked" | "tierlists" | "playlists" | "songs" | "artists"
   >("albums");
   const [searchQuery, setSearchQuery] = useState("");
+  const [offlineInnerTab, setOfflineInnerTab] = useState<"cached" | "local">("cached");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [playlistMenuTrackId, setPlaylistMenuTrackId] = useState<string | null>(null);
 
   // Offline Cached Audio state
   const [cachedAudioItems, setCachedAudioItems] = useState<CachedAudioItem[]>([]);
   const [cachedStats, setCachedStats] = useState<{ count: number; totalBytes: number }>({ count: 0, totalBytes: 0 });
+
+  // Recently played (listen history) — hidden for now, flip to reuse later
+  const SHOW_RECENTLY_PLAYED = false;
+  const [recentHistory, setRecentHistory] = useState<ListenHistoryItem[]>([]);
+  const [isReplaying, setIsReplaying] = useState(false);
 
   React.useEffect(() => {
     const refreshCached = async () => {
@@ -121,6 +132,20 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     const unsub = offlineCache.subscribe(refreshCached);
     return unsub;
   }, []);
+
+  // Refresh listen history whenever the Cached inner tab is shown
+  useEffect(() => {
+    if (!SHOW_RECENTLY_PLAYED) return;
+    if (activeSubTab === "offline" && offlineInnerTab === "cached") {
+      const seen = new Set<string>();
+      const deduped = getStoredHistory().filter((h) => {
+        if (seen.has(h.trackId)) return false;
+        seen.add(h.trackId);
+        return true;
+      });
+      setRecentHistory(deduped.slice(0, 8));
+    }
+  }, [activeSubTab, offlineInnerTab]);
 
   // Mobile swipe gesture between subtabs
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
@@ -364,18 +389,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
   const handlePlayOfflineTrack = (item: CachedAudioItem) => {
     const parentAlbum = albums.find((a) => a.id === item.albumId);
-    const track: Track = {
-      id: item.id,
-      title: item.title,
-      artist: item.artist,
-      album: item.album || parentAlbum?.title || "Offline Storage",
-      albumId: item.albumId,
-      trackNumber: item.trackNumber || 1,
-      duration: item.duration,
-      streamUrl: item.streamUrl,
-      audioUrl: item.streamUrl,
-      format: item.mimeType?.includes("flac") ? "FLAC" : "MP3",
-    };
+    const track = mapOfflineToTrack(item);
     const fallbackAlbum: Album = parentAlbum || {
       id: item.albumId || `album_${item.id}`,
       identifier: item.albumId || `album_${item.id}`,
@@ -387,18 +401,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       source: "local",
       capturedAt: new Date().toISOString(),
     };
-    const allTracks: Track[] = displayedOfflineItems.map((it) => ({
-      id: it.id,
-      title: it.title,
-      artist: it.artist,
-      album: it.album,
-      albumId: it.albumId,
-      trackNumber: it.trackNumber || 1,
-      duration: it.duration,
-      streamUrl: it.streamUrl,
-      audioUrl: it.streamUrl,
-      format: it.mimeType?.includes("flac") ? "FLAC" : "MP3",
-    }));
+    const allTracks: Track[] = displayedOfflineItems.map(mapOfflineToTrack);
     playTrack(track, fallbackAlbum, allTracks);
     if (onShowToast) {
       onShowToast(`Playing "${item.title}" directly from offline cache (0ms latency)`, "success");
@@ -407,18 +410,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
   const handleShuffleAllOffline = () => {
     if (displayedOfflineItems.length === 0) return;
-    const allTracks: Track[] = displayedOfflineItems.map((it) => ({
-      id: it.id,
-      title: it.title,
-      artist: it.artist,
-      album: it.album,
-      albumId: it.albumId,
-      trackNumber: it.trackNumber || 1,
-      duration: it.duration,
-      streamUrl: it.streamUrl,
-      audioUrl: it.streamUrl,
-      format: it.mimeType?.includes("flac") ? "FLAC" : "MP3",
-    }));
+    const allTracks: Track[] = displayedOfflineItems.map(mapOfflineToTrack);
     const albumMap = new Map<string, Album>();
     displayedOfflineItems.forEach((it) => {
       const existingAlbum = albums.find((a) => a.id === it.albumId);
@@ -440,6 +432,53 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     playRandomTracks(allTracks, (t) => albumMap.get(t.id));
     if (onShowToast) {
       onShowToast(`Shuffling ${allTracks.length} offline tracks`, "success");
+    }
+  };
+
+  const mapOfflineToTrack = (it: CachedAudioItem): Track => ({
+    id: it.id,
+    title: it.title,
+    artist: it.artist,
+    album: it.album,
+    albumId: it.albumId,
+    trackNumber: it.trackNumber || 1,
+    duration: it.duration,
+    streamUrl: it.streamUrl,
+    audioUrl: it.streamUrl,
+    format: it.mimeType?.includes("flac") ? "FLAC" : "MP3",
+  });
+
+  const handlePlayAllOffline = () => {
+    if (displayedOfflineItems.length === 0) return;
+    const allTracks = displayedOfflineItems.map(mapOfflineToTrack);
+    playTrack(allTracks[0], undefined, allTracks);
+    if (onShowToast) {
+      onShowToast(`Playing ${allTracks.length} cached tracks in order`, "success");
+    }
+  };
+
+  const handleReplayHistoryItem = async (item: ListenHistoryItem) => {
+    if (isReplaying) return;
+    if (!item.albumId || item.albumId === "local_library") {
+      onShowToast?.("Local file replay lives in the Local files tab.", "info");
+      return;
+    }
+    setIsReplaying(true);
+    try {
+      const album = await fetchAlbumDetails(item.albumId);
+      const track =
+        album.tracks.find((t) => t.id === item.trackId) ||
+        album.tracks.find((t) => t.title === item.title) ||
+        album.tracks[0];
+      if (!track) {
+        onShowToast?.("Couldn't reload that recording.", "info");
+        return;
+      }
+      playTrack(track, album, album.tracks);
+    } catch {
+      onShowToast?.("Couldn't reload that recording.", "info");
+    } finally {
+      setIsReplaying(false);
     }
   };
 
@@ -511,6 +550,12 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
+      {/* 0. Vault header — same grid as Search / Discover */}
+      <TabHeader
+        icon={<Disc3 className="w-4 h-4" />}
+        title="Your vault"
+        subtitle={`${albums.length} album${albums.length === 1 ? "" : "s"} • ${playlists.length} playlist${playlists.length === 1 ? "" : "s"} • ${tierLists.length} tier list${tierLists.length === 1 ? "" : "s"}`}
+      />
       {/* 1. General Vault Search Bar & Actions */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         {/* Prominent General Vault Search Input */}
@@ -589,7 +634,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             }`}
           >
             <Database className={`w-3.5 h-3.5 shrink-0 ${activeSubTab === "offline" ? "text-stone-950 fill-stone-950" : "text-emerald-400"}`} />
-            <span>Offline ({cachedAudioItems.length})</span>
+            <span>Offline</span>
           </button>
           <button
             id="subtab-liked"
@@ -686,6 +731,34 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       {/* VIEW: OFFLINE CACHE (OPFS / INDEXEDDB) */}
       {activeSubTab === "offline" && (
         <div className="space-y-4">
+          {/* Inner tabs: pinned cache vs device library */}
+          <div className="flex items-center space-x-1 p-1 rounded-xl bg-stone-900/60 border border-stone-800 w-fit">
+            <button
+              onClick={() => setOfflineInnerTab("cached")}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                offlineInnerTab === "cached"
+                  ? "bg-emerald-500 text-stone-950"
+                  : "text-stone-400 hover:text-stone-200"
+              }`}
+            >
+              Cached
+            </button>
+            <button
+              onClick={() => setOfflineInnerTab("local")}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                offlineInnerTab === "local"
+                  ? "bg-sky-500 text-stone-950"
+                  : "text-stone-400 hover:text-stone-200"
+              }`}
+            >
+              Local files
+            </button>
+          </div>
+
+          {offlineInnerTab === "local" ? (
+            <LocalLibraryTab searchQuery={searchQuery} onShowToast={onShowToast} />
+          ) : (
+          <>
           {/* Header Stats & Quick Action Bar */}
           <div className="p-4 rounded-2xl bg-stone-900/60 border border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center space-x-3">
@@ -707,14 +780,22 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             </div>
 
             {cachedAudioItems.length > 0 && (
-              <div className="flex items-center space-x-2 self-start sm:self-auto">
+              <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
+                <button
+                  id="btn-offline-play-all"
+                  onClick={handlePlayAllOffline}
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-bold text-xs transition-all flex items-center space-x-1.5 cursor-pointer shadow-md"
+                >
+                  <Play className="w-3.5 h-3.5 fill-stone-950" />
+                  <span>Play all</span>
+                </button>
                 <button
                   id="btn-offline-shuffle-all"
                   onClick={handleShuffleAllOffline}
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-bold text-xs transition-all flex items-center space-x-1.5 cursor-pointer shadow-md"
+                  className="px-4 py-2 rounded-xl bg-stone-900 hover:bg-stone-850 text-stone-200 border border-stone-800 font-semibold text-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
                 >
                   <Shuffle className="w-3.5 h-3.5" />
-                  <span>Shuffle Offline</span>
+                  <span>Shuffle</span>
                 </button>
                 <button
                   id="btn-offline-clear-all"
@@ -727,6 +808,40 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               </div>
             )}
           </div>
+
+          {/* Recently played — hidden for now (SHOW_RECENTLY_PLAYED), reuse later */}
+          {SHOW_RECENTLY_PLAYED && recentHistory.length > 0 && (
+            <div className="bg-stone-900/50 border border-stone-800 rounded-2xl overflow-hidden">
+              <div className="px-3.5 py-2.5 bg-stone-950/60 text-[10px] uppercase font-semibold text-stone-500 flex items-center gap-1.5">
+                <History className="w-3 h-3" />
+                <span>Recently played</span>
+              </div>
+              <div className="divide-y divide-stone-800/50">
+                {recentHistory.map((h) => (
+                  <div
+                    key={h.id}
+                    className="group px-3 py-2 flex items-center justify-between text-xs hover:bg-stone-800/40 text-stone-200 transition-colors"
+                  >
+                    <button
+                      onClick={() => handleReplayHistoryItem(h)}
+                      disabled={isReplaying}
+                      className="flex items-center space-x-2.5 min-w-0 flex-1 pr-2 text-left cursor-pointer disabled:opacity-50"
+                      title="Replay this recording"
+                    >
+                      <Play className="w-3 h-3 text-stone-500 group-hover:text-emerald-400 fill-current shrink-0" />
+                      <span className="truncate font-medium text-stone-100">{h.title}</span>
+                      <span className="text-stone-500 text-[11px] truncate">
+                        {h.artist} <span className="text-stone-600">•</span> {h.album}
+                      </span>
+                    </button>
+                    <span className="font-mono text-[10px] text-stone-500 shrink-0">
+                      {new Date(h.listenedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* List of Offline Tracks */}
           {cachedAudioItems.length === 0 ? (
@@ -822,6 +937,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 );
               })}
             </div>
+          )}
+          </>
           )}
         </div>
       )}

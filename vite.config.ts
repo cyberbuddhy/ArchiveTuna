@@ -41,6 +41,9 @@ export default defineConfig(() => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+        // jsmediatags ships a broken `browser` entry (dist/jsmediatags.js is
+        // missing from the npm tarball) — point at the shipped UMD bundle.
+        'jsmediatags': path.resolve(__dirname, 'node_modules/jsmediatags/dist/jsmediatags.min.js'),
       },
     },
     build: {
