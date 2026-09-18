@@ -488,7 +488,8 @@ export default function App() {
         ...targetPl,
         tracks: updatedTracks,
         updatedAt: new Date().toISOString(),
-        coverUrl: targetPl.coverUrl || (track as any).coverUrl,
+        // Track has no coverUrl — keep the playlist's existing cover
+        coverUrl: targetPl.coverUrl,
       };
       const next = [...prev];
       next[idx] = updatedPl;

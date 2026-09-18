@@ -34,6 +34,21 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// Upstream fetch with timeout so one hung provider can't stall an endpoint
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+  timeoutMs = 12000
+): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Re-Ranking helper for search relevance
 function computeRelevanceScore(
   item: { artist?: string; title?: string; downloads?: number },
@@ -159,7 +174,7 @@ app.get("/api/archive/search", async (req, res) => {
     searchUrl.searchParams.append("fl[]", "genre");
     searchUrl.searchParams.append("fl[]", "subject");
 
-    const response = await fetch(searchUrl.toString(), {
+    const response = await fetchWithTimeout(searchUrl.toString(), {
       headers: {
         "User-Agent": "ArchiveMusicVault/1.0",
         Accept: "application/json",
@@ -233,14 +248,15 @@ app.get("/api/artist/discography", async (req, res) => {
     const mbSearchUrl = `https://musicbrainz.org/ws/2/artist/?query=artist:${encodeURIComponent(artistName)}&fmt=json`;
     let mbArtist: any = null;
     let releaseGroups: any[] = [];
+    let mbDegraded = false;
 
     try {
-      const mbRes = await fetch(mbSearchUrl, {
+      const mbRes = await fetchWithTimeout(mbSearchUrl, {
         headers: {
           "User-Agent": "ArchiveMusicVault/1.0.0 (https://archive.org)",
           Accept: "application/json",
         },
-      });
+      }, 10000);
 
       if (mbRes.ok) {
         const mbData = await mbRes.json();
@@ -251,12 +267,12 @@ app.get("/api/artist/discography", async (req, res) => {
           
           if (mbArtist && mbArtist.id) {
             const rgUrl = `https://musicbrainz.org/ws/2/release-group?artist=${encodeURIComponent(mbArtist.id)}&limit=100&fmt=json`;
-            const rgRes = await fetch(rgUrl, {
+            const rgRes = await fetchWithTimeout(rgUrl, {
               headers: {
                 "User-Agent": "ArchiveMusicVault/1.0.0 (https://archive.org)",
                 Accept: "application/json",
               },
-            });
+            }, 10000);
             if (rgRes.ok) {
               const rgData = await rgRes.json();
               releaseGroups = rgData["release-groups"] || [];
@@ -265,6 +281,7 @@ app.get("/api/artist/discography", async (req, res) => {
         }
       }
     } catch (mbErr) {
+      mbDegraded = true;
       console.warn("MusicBrainz query warning:", mbErr);
     }
 
@@ -287,9 +304,10 @@ app.get("/api/artist/discography", async (req, res) => {
 
     let liveTapes: any[] = [];
     let totalLiveTapes = 0;
+    let archiveDegraded = false;
 
     try {
-      const arcRes = await fetch(archiveUrl.toString(), {
+      const arcRes = await fetchWithTimeout(archiveUrl.toString(), {
         headers: {
           "User-Agent": "ArchiveMusicVault/1.0.0",
           Accept: "application/json",
@@ -318,6 +336,7 @@ app.get("/api/artist/discography", async (req, res) => {
         });
       }
     } catch (arcErr) {
+      archiveDegraded = true;
       console.warn("Archive.org artist query warning:", arcErr);
     }
 
@@ -406,6 +425,11 @@ app.get("/api/artist/discography", async (req, res) => {
       officialLiveReleases,
       liveTapes,
       totalLiveTapes,
+      partial: mbDegraded || archiveDegraded,
+      warnings: [
+        ...(mbDegraded ? ["MusicBrainz unavailable — official releases may be incomplete"] : []),
+        ...(archiveDegraded ? ["Archive.org unavailable — live tapes may be incomplete"] : []),
+      ],
     });
   } catch (err: any) {
     console.error("Error fetching artist discography:", err);
@@ -438,7 +462,7 @@ app.get("/api/archive/album/:identifier", async (req, res) => {
     }
 
     const metaUrl = `https://archive.org/metadata/${encodeURIComponent(identifier)}`;
-    const response = await fetch(metaUrl, {
+    const response = await fetchWithTimeout(metaUrl, {
       headers: {
         "User-Agent": "ArchiveMusicVault/1.0",
         Accept: "application/json",
@@ -587,7 +611,7 @@ app.post("/api/archive/resolve-url", async (req, res) => {
     if (identifier) {
       // Redirect internally to album details
       const metaUrl = `https://archive.org/metadata/${encodeURIComponent(identifier)}`;
-      const metaRes = await fetch(metaUrl);
+      const metaRes = await fetchWithTimeout(metaUrl, {}, 8000);
       if (metaRes.ok) {
         const data = await metaRes.json();
         if (data.metadata && Object.keys(data.metadata).length > 0) {
@@ -720,7 +744,21 @@ Also provide:
         });
 
         if (response.text) {
-          aiRecommendations = JSON.parse(response.text.trim());
+          try {
+            const parsed: unknown = JSON.parse(response.text.trim());
+            if (
+              parsed &&
+              typeof parsed === "object" &&
+              Array.isArray((parsed as { discoveries?: unknown }).discoveries) &&
+              (parsed as { discoveries: unknown[] }).discoveries.length > 0
+            ) {
+              aiRecommendations = parsed;
+            } else {
+              console.warn("Gemini discovery schema mismatch — using curated fallback");
+            }
+          } catch (parseErr) {
+            console.warn("Gemini discovery parse fallback:", parseErr);
+          }
         }
       } catch (aiErr) {
         console.warn("Gemini discovery generation fallback:", aiErr);
@@ -791,9 +829,9 @@ Also provide:
           sUrl.searchParams.append("fl[]", "downloads");
           sUrl.searchParams.append("fl[]", "collection");
 
-          const res = await fetch(sUrl.toString(), {
+          const res = await fetchWithTimeout(sUrl.toString(), {
             headers: { "User-Agent": "ArchiveMusicVault/1.0" },
-          });
+          }, 10000);
 
           if (res.ok) {
             const data = await res.json();
@@ -832,17 +870,34 @@ Also provide:
   }
 });
 
-// Audio streaming proxy if direct streaming has CORS or range issues
+// Audio streaming proxy — allowlisted to archive.org hosts only (no open proxy)
+const PROXY_ALLOWED_HOSTS = new Set([
+  "archive.org",
+  "coverartarchive.org",
+  "musicbrainz.org",
+]);
+function isProxyHostAllowed(host: string): boolean {
+  const h = host.toLowerCase();
+  if (PROXY_ALLOWED_HOSTS.has(h)) return true;
+  // Archive.org download nodes: ia801xxx.us.archive.org
+  return /(^|\.)us\.archive\.org$/.test(h) || /(^|\.)archive\.org$/.test(h);
+}
+
 app.get("/api/audio-proxy", async (req, res) => {
   const controller = new AbortController();
-  req.on("close", () => {
-    controller.abort();
-  });
+  const onClose = () => controller.abort();
+  req.on("close", onClose);
 
   try {
     const streamUrl = String(req.query.url || "");
-    if (!streamUrl || (!streamUrl.startsWith("http://") && !streamUrl.startsWith("https://"))) {
+    let parsed: URL;
+    try {
+      parsed = new URL(streamUrl);
+    } catch {
       return res.status(400).send("Invalid stream URL");
+    }
+    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || !isProxyHostAllowed(parsed.hostname)) {
+      return res.status(403).send("Stream host not allowed");
     }
 
     const range = req.headers.range;
@@ -853,13 +908,13 @@ app.get("/api/audio-proxy", async (req, res) => {
       fetchHeaders["Range"] = range;
     }
 
-    const audioRes = await fetch(streamUrl, {
+    const audioRes = await fetchWithTimeout(streamUrl, {
       headers: fetchHeaders,
       signal: controller.signal,
-    });
+    }, 30000);
 
     res.status(audioRes.status);
-    const forwardHeaders = ["content-type", "content-length", "content-range", "accept-ranges"];
+    const forwardHeaders = ["content-type", "content-length", "content-range", "accept-ranges", "etag", "last-modified"];
     forwardHeaders.forEach((h) => {
       const val = audioRes.headers.get(h);
       if (val) res.setHeader(h, val);
@@ -867,34 +922,36 @@ app.get("/api/audio-proxy", async (req, res) => {
 
     if (audioRes.body) {
       const reader = audioRes.body.getReader();
-      const pump = async () => {
-        try {
+      try {
+        for (;;) {
           const { done, value } = await reader.read();
-          if (done || res.writableEnded) {
-            if (!res.writableEnded) res.end();
-            return;
+          if (done || res.writableEnded) break;
+          const ok = res.write(Buffer.from(value));
+          if (!ok) {
+            await new Promise<void>((resolve) => res.once("drain", () => resolve()));
           }
-          res.write(Buffer.from(value), (err) => {
-            if (err) {
-              reader.cancel().catch(() => {});
-            }
-          });
-          await pump();
-        } catch {
-          // aborted or disconnected
-          try {
-            await reader.cancel();
-          } catch {}
         }
-      };
-      await pump();
+      } catch {
+        // aborted or disconnected
+      } finally {
+        try {
+          await reader.cancel();
+        } catch {}
+      }
+      if (!res.writableEnded) res.end();
     } else {
       res.end();
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (!res.headersSent) {
-      res.status(502).send("Failed to stream audio");
+      if (err instanceof Error && err.name === "AbortError") {
+        res.status(504).send("Upstream stream timed out");
+      } else {
+        res.status(502).send("Failed to stream audio");
+      }
     }
+  } finally {
+    req.off("close", onClose);
   }
 });
 

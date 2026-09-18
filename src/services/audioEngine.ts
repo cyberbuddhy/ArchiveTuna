@@ -37,7 +37,7 @@ class AudioEngine {
     } catch { /* native fallback */ }
   }
   resume() { this.ctx?.resume().catch(() => {}); }
-  updateSettings(s: PlayerSettings) {
+  updateSettings(s: Partial<PlayerSettings>) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     this.pre?.gain.setTargetAtTime(s.preamp ?? 1, t, 0.02);
