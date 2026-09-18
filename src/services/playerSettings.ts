@@ -69,6 +69,9 @@ const SETTINGS_STORAGE_KEY = "archive_tuner_player_settings";
 
 export function getStoredPlayerSettings(): PlayerSettings {
   try {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return { ...DEFAULT_PLAYER_SETTINGS };
+    }
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
@@ -84,6 +87,7 @@ export function savePlayerSettings(settings: Partial<PlayerSettings>): PlayerSet
   try {
     const current = getStoredPlayerSettings();
     const updated = { ...current, ...settings };
+    if (typeof window === "undefined" || !window.localStorage) return updated;
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
     // Dispatch custom event for cross-component immediate reactivity
     window.dispatchEvent(new CustomEvent("archive_settings_changed", { detail: updated }));

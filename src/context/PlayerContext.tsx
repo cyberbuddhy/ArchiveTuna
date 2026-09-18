@@ -74,8 +74,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isOfflineDownloading, setIsOfflineDownloading] = useState<boolean>(false);
   const [offlineVersion, setOfflineVersion] = useState<number>(0);
 
-  // Subscribe to offline cache changes
+  // Subscribe to offline cache changes (sync on mount to avoid pin flicker)
   useEffect(() => {
+    void offlineCache.syncCachedIds().catch(() => {});
     const unsub = offlineCache.subscribe(() => {
       setOfflineVersion((v) => v + 1);
     });
@@ -120,17 +121,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     }, 1000);
 
-    const handleSettingsChanged = (e: any) => {
-      const updated = e.detail;
-      if (updated) {
-        if (updated.defaultPlaybackRate !== undefined) {
-          setPlaybackRateState(updated.defaultPlaybackRate);
-          if (audioRef.current) {
-            audioRef.current.playbackRate = updated.defaultPlaybackRate;
-          }
+    const handleSettingsChanged = (e: Event) => {
+      const updated = (e as CustomEvent<Partial<PlayerSettings>>).detail;
+      if (!updated || typeof updated !== "object") return;
+      if (updated.defaultPlaybackRate !== undefined) {
+        setPlaybackRateState(updated.defaultPlaybackRate);
+        if (audioRef.current) {
+          audioRef.current.playbackRate = updated.defaultPlaybackRate;
         }
-        audioEngine.updateSettings(updated);
       }
+      audioEngine.updateSettings(updated);
     };
 
     window.addEventListener("archive_settings_changed", handleSettingsChanged);
@@ -248,6 +248,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       (async () => {
         try {
           const { fetchRelatedTracks } = await import("../services/autoplay");
+          // Re-check after await: user may have skipped mid-fetch — never hijack
+          if (stateRef.current.currentTrack?.id !== seedId) { setIsLoading(false); return; }
           const st = stateRef.current;
           // User moved on mid-fetch: abort, don't hijack playback
           if (st.currentTrack?.id !== seedId) { setIsLoading(false); return; }
@@ -333,6 +335,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       audio.removeEventListener("error", handleError);
       audio.pause();
       audio.src = "";
+      if (currentBlobUrlRef.current) {
+        URL.revokeObjectURL(currentBlobUrlRef.current);
+        currentBlobUrlRef.current = null;
+      }
     };
   }, []);
 
@@ -601,9 +607,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
     if (!next || prefetchedRef.current === next.id) return;
+    if (!next.streamUrl) return;
     if (remain < 15 || currentTime / duration > 0.8) {
       prefetchedRef.current = next.id;
-      try { fetch(next.streamUrl, { mode: "no-cors" }).catch(() => {}); } catch { /* noop */ }
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 15000);
+        fetch(next.streamUrl, { mode: "no-cors", signal: ctrl.signal })
+          .catch(() => {})
+          .finally(() => clearTimeout(timer));
+      } catch { /* noop */ }
     }
   }, [currentTime, duration, queue, queueIndex, currentTrack]);
 
@@ -661,9 +674,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         navigator.mediaSession &&
         currentTrack
       ) {
-        if (typeof (window as any).MediaMetadata !== "undefined") {
+        const MediaMetadataCtor =
+          typeof window !== "undefined"
+            ? (window as unknown as { MediaMetadata?: typeof MediaMetadata }).MediaMetadata
+            : undefined;
+        if (MediaMetadataCtor) {
           try {
-            navigator.mediaSession.metadata = new (window as any).MediaMetadata({
+            navigator.mediaSession.metadata = new MediaMetadataCtor({
               title: currentTrack.title || "Archive Recording",
               artist: currentTrack.artist || currentAlbum?.artist || "Unknown Artist",
               album: currentTrack.album || currentAlbum?.title || "Archive.org Audio",

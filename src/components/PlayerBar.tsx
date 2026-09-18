@@ -30,6 +30,7 @@ import { Album } from "../types";
 import { fetchAlbumDetails } from "../services/api";
 import { downloadAlbumZip, downloadTrackAudio } from "../utils/download";
 import { Waveform } from "./Waveform";
+import { formatTime } from "../utils/format";
 import { getStoredPlayerSettings, savePlayerSettings } from "../services/playerSettings";
 
 interface PlayerBarProps {
@@ -116,12 +117,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
   const activeAlbumId = currentAlbum?.id || currentTrack.albumId;
   const isFav = activeAlbumId ? isAlbumFavorite?.(activeAlbumId) : false;
 
-  const formatTime = (secs: number) => {
-    if (!secs || isNaN(secs)) return "0:00";
-    const m = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
-    return `${m}:${s < 10 ? "0" : ""}${s}`;
-  };
+  const formatTimeLabel = (secs: number) => formatTime(secs, "0:00");
 
   const handleAlbumClick = async () => {
     if (!onSelectAlbumForDetail) return;
@@ -463,8 +459,8 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
                 />
               </div>
               <div className="flex items-center justify-between text-[11px] font-mono text-stone-400">
-                <span>{formatTime(currentTime)}</span>
-                <span>{formatTime(duration)}</span>
+                <span>{formatTimeLabel(currentTime)}</span>
+                <span>{formatTimeLabel(duration)}</span>
               </div>
             </div>
 
@@ -722,7 +718,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
                 <h3 className="text-sm font-bold text-stone-100">Play Queue</h3>
                 <p className="text-[11px] text-stone-400">
                   {queue.length} {queue.length === 1 ? "track" : "tracks"}
-                  {remainingQueueTime > 0 && ` • ~${formatTime(remainingQueueTime)} remaining`}
+                  {remainingQueueTime > 0 && ` • ~${formatTimeLabel(remainingQueueTime)} remaining`}
                 </p>
               </div>
             </div>
@@ -760,7 +756,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
               </span>
             </div>
             <span className="text-[10px] font-mono text-stone-400 shrink-0">
-              {formatTime(currentTime)} / {formatTime(duration)}
+              {formatTimeLabel(currentTime)} / {formatTimeLabel(duration)}
             </span>
           </div>
 
@@ -810,7 +806,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
 
                     <div className="flex items-center space-x-2 shrink-0">
                       <span className="text-[10px] font-mono text-stone-400">
-                        {formatTime(track.duration)}
+                        {formatTimeLabel(track.duration)}
                       </span>
                       {track.streamUrl && (
                         <button
@@ -879,7 +875,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
                   </h3>
                   <p className="text-[11px] text-stone-400">
                     {queue.length} {queue.length === 1 ? "track" : "tracks"}
-                    {remainingQueueTime > 0 && ` • ~${formatTime(remainingQueueTime)} remaining`}
+                    {remainingQueueTime > 0 && ` • ~${formatTimeLabel(remainingQueueTime)} remaining`}
                   </p>
                 </div>
               </div>
@@ -928,7 +924,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
 
                     <div className="flex items-center space-x-2 shrink-0">
                       <span className="text-[10px] font-mono text-stone-400">
-                        {formatTime(track.duration)}
+                        {formatTimeLabel(track.duration)}
                       </span>
                       {track.streamUrl && (
                         <button
@@ -985,7 +981,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
               className="absolute bottom-full mb-2 -translate-x-1/2 px-2 py-0.5 rounded-md bg-stone-900 border border-stone-700 text-stone-200 text-[10px] font-mono shadow-xl pointer-events-none z-50 whitespace-nowrap"
               style={{ left: `${hoverPosition}px` }}
             >
-              {formatTime(hoverTime)}
+              {formatTimeLabel(hoverTime)}
             </div>
           )}
         </div>
@@ -1222,9 +1218,9 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
 
             {/* Time Display */}
             <div className="flex items-center space-x-1.5 text-[11px] font-mono text-stone-400">
-              <span className="text-stone-300 font-medium">{formatTime(currentTime)}</span>
+              <span className="text-stone-300 font-medium">{formatTimeLabel(currentTime)}</span>
               <span className="text-stone-600">/</span>
-              <span>{formatTime(duration)}</span>
+              <span>{formatTimeLabel(duration)}</span>
             </div>
           </div>
 

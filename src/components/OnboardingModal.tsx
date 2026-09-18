@@ -95,7 +95,8 @@ export function hasSeenOnboarding(): boolean {
   try {
     return localStorage.getItem("tuna_onboarded") === "1";
   } catch {
-    return true;
+    // Storage blocked: show the tour so first-run users still get oriented
+    return false;
   }
 }
 export function markOnboardingDone() {

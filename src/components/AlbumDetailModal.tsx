@@ -24,6 +24,7 @@ import { Album, Track, Playlist, TierRank, TierList, TierItem } from "../types";
 import { usePlayer } from "../context/PlayerContext";
 import { TIER_RANKS, TIER_CONFIG } from "../utils/tierList";
 import { offlineCache } from "../services/offlineCache";
+import { formatTime } from "../utils/format";
 
 interface AlbumDetailModalProps {
   album: Album | null;
@@ -229,12 +230,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
     onUpdateAlbum(updated);
   };
 
-  const formatDuration = (seconds: number) => {
-    if (!seconds || isNaN(seconds)) return "--:--";
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
-  };
+  const formatDuration = (seconds: number) => formatTime(seconds, "--:--");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>

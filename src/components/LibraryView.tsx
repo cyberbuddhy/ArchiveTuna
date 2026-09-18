@@ -30,6 +30,7 @@ import { downloadAlbumZip, downloadTrackAudio } from "../utils/download";
 import { TierListView } from "./TierListView";
 import { TIER_CONFIG } from "../utils/tierList";
 import { offlineCache, CachedAudioItem } from "../services/offlineCache";
+import { formatTime } from "../utils/format";
 
 interface VaultArtist {
   name: string;
@@ -312,12 +313,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     return vaultArtists.filter((art) => art.name.toLowerCase().includes(q));
   }, [vaultArtists, searchQuery]);
 
-  const formatDuration = (seconds: number) => {
-    if (!seconds || isNaN(seconds)) return "--:--";
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
-  };
+  const formatDuration = (seconds: number) => formatTime(seconds, "--:--");
 
   const totalSongsDuration = useMemo(() => {
     return displayedSongs.reduce((acc, s) => acc + (s.track.duration || 0), 0);
