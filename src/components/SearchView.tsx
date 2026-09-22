@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Search,
   Plus,
@@ -25,6 +25,7 @@ import {
 import { downloadAlbumZip } from "../utils/download";
 import {
   Album,
+  ListenHistoryItem,
   SearchFieldType,
   SearchCollectionType,
   SearchEraType,
@@ -39,7 +40,13 @@ import {
   addSearchHistoryItem,
   removeSearchHistoryItem,
   clearStoredSearchHistory,
+  getStoredHistory,
 } from "../services/storage";
+import {
+  getContinueAlbums,
+  getListeningStats,
+  timeAgo,
+} from "../services/insights";
 import { usePlayer } from "../context/PlayerContext";
 import { ArchiveLogo } from "./ArchiveLogo";
 import { TIER_CONFIG } from "../utils/tierList";
@@ -63,7 +70,29 @@ export const SearchView: React.FC<SearchViewProps> = ({
   onOpenArtistDiscography,
   initialSearch,
 }) => {
-  const { playAlbum, currentTrack, isPlaying } = usePlayer();
+  const { playAlbum, playTrack, currentTrack, isPlaying } = usePlayer();
+
+  // Home shelf: recent albums + stats, shown until the first search
+  const [homeHistory, setHomeHistory] = useState<ListenHistoryItem[]>([]);
+  const [openingAlbumId, setOpeningAlbumId] = useState<string | null>(null);
+  useEffect(() => {
+    setHomeHistory(getStoredHistory());
+  }, []);
+  const homeContinue = useMemo(() => getContinueAlbums(homeHistory, 8), [homeHistory]);
+  const homeStats = useMemo(() => getListeningStats(homeHistory), [homeHistory]);
+
+  const handleOpenContinueAlbum = async (albumId: string) => {
+    if (openingAlbumId) return;
+    setOpeningAlbumId(albumId);
+    try {
+      const full = await fetchAlbumDetails(albumId);
+      onSelectAlbumForDetail(full);
+    } catch {
+      // Unresolvable album (deleted upstream?) — stay on search
+    } finally {
+      setOpeningAlbumId(null);
+    }
+  };
 
   // Search input state
   const [searchQuery, setSearchQuery] = useState("");
@@ -1037,6 +1066,58 @@ export const SearchView: React.FC<SearchViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* HOME: continue listening + stats, only before the first search */}
+      {!hasSearched && homeContinue.length > 0 && (
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs sm:text-sm font-semibold text-stone-200">Continue listening</h3>
+            <span className="font-mono text-[11px] text-stone-500">
+              {homeStats.minutesListened >= 60
+                ? `${(homeStats.minutesListened / 60).toFixed(1)}h`
+                : `${homeStats.minutesListened}m`}
+              {" "}· {homeStats.uniqueArtists} artists · {homeStats.totalListens} plays
+              {homeStats.dayStreak > 1 && ` · ${homeStats.dayStreak}d streak`}
+            </span>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-none">
+            {homeContinue.map((c) => (
+              <button
+                key={c.albumId}
+                type="button"
+                onClick={() => handleOpenContinueAlbum(c.albumId)}
+                disabled={openingAlbumId !== null}
+                className="group w-28 shrink-0 text-left cursor-pointer disabled:opacity-60"
+                title={`Open ${c.album}`}
+              >
+                <div className="relative aspect-square rounded-lg overflow-hidden bg-stone-900 border border-stone-800 mb-1.5">
+                  <img
+                    src={`https://archive.org/services/img/${c.albumId}`}
+                    alt={c.album}
+                    loading="lazy"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                  {openingAlbumId === c.albumId && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                      <Loader2 className="w-5 h-5 animate-spin text-amber-400" />
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs font-semibold text-stone-100 truncate group-hover:text-amber-300">
+                  {c.album}
+                </p>
+                <p className="text-[11px] text-stone-400 truncate">{c.artist}</p>
+                <p className="font-mono text-[10px] text-stone-500 truncate mt-0.5">
+                  {c.plays} play{c.plays === 1 ? "" : "s"} · {timeAgo(c.listenedAt)}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* SEARCH RESULTS */}
       {hasSearched && (

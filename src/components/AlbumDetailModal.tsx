@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   X,
   Play,
@@ -17,6 +17,7 @@ import {
   Layers,
   Database,
   Loader2,
+  Mic,
 } from "lucide-react";
 import { downloadAlbumZip, downloadTrackAudio } from "../utils/download";
 import { linkForAlbum, linkForSong } from "../services/share";
@@ -25,6 +26,7 @@ import { usePlayer } from "../context/PlayerContext";
 import { TIER_RANKS, TIER_CONFIG } from "../utils/tierList";
 import { offlineCache } from "../services/offlineCache";
 import { formatTime } from "../utils/format";
+import { currentLyricIndex, fetchLyrics, LyricsResult } from "../services/lyrics";
 
 interface AlbumDetailModalProps {
   album: Album | null;
@@ -59,7 +61,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   vaultAction,
   isInVault,
 }) => {
-  const { playTrack, playAlbum, currentTrack, isPlaying } = usePlayer();
+  const { playTrack, playAlbum, currentTrack, currentTime, isPlaying } = usePlayer();
   const [activeTab, setActiveTab] = useState<"tracks" | "notes">("tracks");
   const [noteText, setNoteText] = useState(album?.userNotes || "");
   const [tagInput, setTagInput] = useState("");
@@ -68,6 +70,40 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   const [newSingleName, setNewSingleName] = useState("");
   const [isAddAllPlaylistOpen, setIsAddAllPlaylistOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+
+  // Inline synced lyrics (lrclib) per track
+  const [lyricsOpenId, setLyricsOpenId] = useState<string | null>(null);
+  const [lyricsMap, setLyricsMap] = useState<Record<string, LyricsResult | null>>({});
+  const [lyricsLoadingId, setLyricsLoadingId] = useState<string | null>(null);
+  const lyricsScrollRef = useRef<HTMLDivElement | null>(null);
+
+  const handleToggleLyrics = async (track: Track) => {
+    if (lyricsOpenId === track.id) {
+      setLyricsOpenId(null);
+      return;
+    }
+    setLyricsOpenId(track.id);
+    if (lyricsMap[track.id] !== undefined) return;
+    setLyricsLoadingId(track.id);
+    try {
+      const res = await fetchLyrics(
+        track.artist || album?.artist || "",
+        track.title,
+        album?.title,
+        track.duration
+      );
+      setLyricsMap((m) => ({ ...m, [track.id]: res }));
+    } finally {
+      setLyricsLoadingId(null);
+    }
+  };
+
+  // Follow the active lyric line inside its own scroll box only
+  useEffect(() => {
+    if (lyricsOpenId == null) return;
+    const el = lyricsScrollRef.current?.querySelector('[data-lr-active="1"]');
+    el?.scrollIntoView({ block: "nearest" });
+  }, [lyricsOpenId, currentTime, currentTrack?.id]);
 
   const copyLink = async (url: string) => {
     try {
@@ -262,14 +298,9 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
             />
 
             <div className="flex-1 min-w-0 space-y-1.5">
-              <div className="flex items-center space-x-2">
-                <span className="px-2 py-0.5 rounded text-[10px] uppercase font-semibold tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                  {album.collection || "Archive.org"}
-                </span>
-                {album.year && (
-                  <span className="text-xs text-stone-400 font-medium">Year: {album.year}</span>
-                )}
-              </div>
+              {album.year && (
+                <span className="text-xs text-stone-400 font-medium">Year: {album.year}</span>
+              )}
 
               <h2 className="text-lg sm:text-xl font-bold text-stone-100 line-clamp-1">{album.title}</h2>
               <div className="flex items-center space-x-2">
@@ -853,8 +884,8 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                   const isCurrent = currentTrack?.id === track.id;
 
                   return (
+                    <React.Fragment key={track.id || idx}>
                     <div
-                      key={track.id || idx}
                       className={`group flex items-center justify-between p-2.5 rounded-xl transition-colors ${
                         isCurrent
                           ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
@@ -930,6 +961,19 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                           aria-label="Copy shareable song link"
                         >
                           {linkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
+                        </button>
+
+                        <button
+                          onClick={() => handleToggleLyrics(track)}
+                          className={`p-1 rounded transition-colors cursor-pointer ${
+                            lyricsOpenId === track.id
+                              ? "text-amber-400 bg-amber-500/10"
+                              : "text-stone-500 hover:text-amber-400 hover:bg-stone-800"
+                          }`}
+                          title="Show lyrics"
+                          aria-label="Show lyrics"
+                        >
+                          <Mic className="w-3.5 h-3.5" />
                         </button>
 
                         {/* Add to Playlist Popup (viewport-anchored, never clipped) */}
@@ -1025,6 +1069,53 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                         </div>
                       </div>
                     </div>
+                    {lyricsOpenId === track.id && (
+                      <div
+                        ref={lyricsScrollRef}
+                        className="ml-10 mb-2 rounded-xl bg-stone-950/60 border border-stone-800/60 p-3 max-h-56 overflow-y-auto"
+                      >
+                        {(() => {
+                          if (lyricsLoadingId === track.id) {
+                            return (
+                              <div className="flex items-center gap-2 text-[11px] text-stone-400">
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                                <span>Looking for lyrics…</span>
+                              </div>
+                            );
+                          }
+                          const res = lyricsMap[track.id];
+                          if (!res) {
+                            return <p className="text-[11px] text-stone-500">No lyrics found for this one.</p>;
+                          }
+                          if (res.instrumental) {
+                            return <p className="text-[11px] text-stone-500">Instrumental — no lyrics.</p>;
+                          }
+                          if (res.synced && res.synced.length > 0) {
+                            const active =
+                              isCurrent && currentTrack?.id === track.id
+                                ? currentLyricIndex(res.synced, currentTime)
+                                : -1;
+                            return (
+                              <div className="space-y-1">
+                                {res.synced.map((l, i) => (
+                                  <p
+                                    key={i}
+                                    data-lr-active={i === active ? "1" : undefined}
+                                    className={`text-xs leading-relaxed transition-colors ${
+                                      i === active ? "text-amber-300 font-semibold" : "text-stone-400"
+                                    }`}
+                                  >
+                                    {l.line}
+                                  </p>
+                                ))}
+                              </div>
+                            );
+                          }
+                          return <p className="text-xs text-stone-300 whitespace-pre-line leading-relaxed">{res.plain}</p>;
+                        })()}
+                      </div>
+                    )}
+                    </React.Fragment>
                   );
                 })
               )}

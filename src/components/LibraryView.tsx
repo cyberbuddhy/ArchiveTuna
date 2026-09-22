@@ -27,6 +27,7 @@ import {
 import { Album, Track, Playlist, TierList, ListenHistoryItem } from "../types";
 import { getStoredHistory } from "../services/storage";
 import { fetchAlbumDetails } from "../services/api";
+import { buildSmartMixes, loadHistoryPlayback, SmartMix } from "../services/insights";
 import { usePlayer } from "../context/PlayerContext";
 import { linkForPlaylist } from "../services/share";
 import { downloadAlbumZip, downloadTrackAudio } from "../utils/download";
@@ -55,7 +56,7 @@ interface LibraryViewProps {
   onOpenBackupModal: () => void;
   onOpenSettingsModal?: () => void;
   onAddTrackToPlaylist: (playlistId: string, track: Track) => void;
-  onCreatePlaylist: (name: string, description?: string) => void;
+  onCreatePlaylist: (name: string, description?: string) => Playlist | void;
   onDeletePlaylist: (playlistId: string) => void;
   onUpdatePlaylist: (updated: Playlist) => void;
   onCreateTierList?: (name: string, description?: string) => void;
@@ -188,8 +189,40 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const [editingPlaylistTitle, setEditingPlaylistTitle] = useState(false);
   const [editPlaylistText, setEditPlaylistText] = useState("");
 
+  // Smart mixes: rebuilt live from history + vault (never stored).
+  // NOTE: declared up here — activePlaylist below reads smartMixes on every render.
+  const [mixHistory, setMixHistory] = useState<ListenHistoryItem[]>([]);
+  useEffect(() => {
+    if (activeSubTab === "playlists") setMixHistory(getStoredHistory());
+  }, [activeSubTab]);
+  const smartMixes = useMemo(() => buildSmartMixes(mixHistory, albums), [mixHistory, albums]);
+
+  const activeMix = smartMixes.find((m) => m.id === selectedPlaylistId) || null;
+  const mixAsPlaylist = (m: SmartMix): Playlist => ({
+    id: m.id,
+    name: m.name,
+    description: m.description,
+    createdAt: "",
+    updatedAt: "",
+    tracks: m.tracks,
+  });
   const activePlaylist =
-    playlists.find((p) => p.id === selectedPlaylistId) || playlists[0] || null;
+    playlists.find((p) => p.id === selectedPlaylistId) ||
+    (activeMix ? mixAsPlaylist(activeMix) : null) ||
+    playlists[0] ||
+    (smartMixes[0] ? mixAsPlaylist(smartMixes[0]) : null);
+  const activeIsMix = !!activePlaylist && activePlaylist.id.startsWith("smart_");
+
+  // Menu rows: user playlists + smart mixes, identical rows
+  const filteredMixes = useMemo(() => {
+    if (!searchQuery.trim()) return smartMixes;
+    const q = searchQuery.toLowerCase();
+    return smartMixes.filter(
+      (m) =>
+        (m.name || "").toLowerCase().includes(q) ||
+        (m.description || "").toLowerCase().includes(q)
+    );
+  }, [smartMixes, searchQuery]);
 
   // All unique user tags
   const allTags = useMemo(() => {
@@ -351,7 +384,16 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     });
   }, [allSongs, searchQuery]);
 
-  // Playlists filtered by general vault search
+  const handleSaveMix = (mix: SmartMix) => {
+    const created = onCreatePlaylist(mix.name, mix.description) as Playlist | void;
+    const pl =
+      created && typeof created === "object"
+        ? created
+        : playlists.find((p) => p.name === mix.name);
+    if (!pl) return;
+    onUpdatePlaylist({ ...pl, tracks: mix.tracks, updatedAt: new Date().toISOString() });
+    if (onShowToast) onShowToast(`Saved "${mix.name}" (${mix.tracks.length} tracks)`, "success");
+  };
   const displayedPlaylists = useMemo(() => {
     if (!searchQuery.trim()) return playlists;
     const q = searchQuery.toLowerCase();
@@ -364,6 +406,25 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       return matchName || matchDesc || matchTrack;
     });
   }, [playlists, searchQuery]);
+
+  // Menu rows: user playlists + smart mixes, identical rows.
+  // NOTE: declared here (after displayedPlaylists) — menuRows must not
+  // run before the memos it reads (TDZ crash on every Vault render).
+  const menuRows = useMemo(() => {
+    const rows = displayedPlaylists.map((pl) => ({
+      id: pl.id,
+      name: pl.name,
+      sub: `${pl.tracks.length} track${pl.tracks.length === 1 ? "" : "s"}`,
+    }));
+    for (const m of filteredMixes) {
+      rows.push({
+        id: m.id,
+        name: m.name,
+        sub: `${m.tracks.length} track${m.tracks.length === 1 ? "" : "s"}`,
+      });
+    }
+    return rows;
+  }, [displayedPlaylists, filteredMixes]);
 
   // Tier lists filtered by general vault search
   const displayedTierLists = useMemo(() => {
@@ -575,16 +636,12 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     }
     setIsReplaying(true);
     try {
-      const album = await fetchAlbumDetails(item.albumId);
-      const track =
-        album.tracks.find((t) => t.id === item.trackId) ||
-        album.tracks.find((t) => t.title === item.title) ||
-        album.tracks[0];
-      if (!track) {
+      const loaded = await loadHistoryPlayback(item, fetchAlbumDetails);
+      if (!loaded) {
         onShowToast?.("Couldn't reload that recording.", "info");
         return;
       }
-      playTrack(track, album, album.tracks);
+      playTrack(loaded.track, loaded.album, loaded.album.tracks);
     } catch {
       onShowToast?.("Couldn't reload that recording.", "info");
     } finally {
@@ -1110,7 +1167,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       {/* VIEW 2: PLAYLISTS */}
       {activeSubTab === "playlists" && (
         <div className="space-y-4">
-          {playlists.length > 0 && displayedPlaylists.length === 0 ? (
+          {(menuRows.length === 0 && (playlists.length > 0 || smartMixes.length > 0)) ? (
             <div className="py-12 text-center text-xs text-stone-500 rounded-xl bg-stone-900/30 border border-stone-800 space-y-2">
               <ListMusic className="w-8 h-8 mx-auto text-stone-600" />
               <p>No playlists match "{searchQuery}".</p>
@@ -1173,12 +1230,12 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     </div>
                   </form>
                 )}
-                {displayedPlaylists.map((pl) => {
-                  const isSelected = activePlaylist?.id === pl.id;
+                {menuRows.map((row) => {
+                  const isSelected = activePlaylist?.id === row.id;
                   return (
                     <button
-                      key={pl.id}
-                      onClick={() => setSelectedPlaylistId(pl.id)}
+                      key={row.id}
+                      onClick={() => setSelectedPlaylistId(row.id)}
                       className={`group w-full text-left p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
                         isSelected
                           ? "bg-amber-500/10 border-amber-500/30 text-amber-300 shadow-sm"
@@ -1187,10 +1244,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     >
                       <div className="min-w-0 flex-1 mr-2">
                         <h4 className="text-xs font-semibold truncate group-hover:text-amber-300">
-                          {pl.name}
+                          {row.name}
                         </h4>
                         <p className="text-[10px] text-stone-500 mt-0.5">
-                          {pl.tracks.length} track{pl.tracks.length === 1 ? "" : "s"}
+                          {row.sub}
                         </p>
                       </div>
                     </button>
@@ -1225,15 +1282,17 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                           <h2 className="text-base sm:text-lg font-bold text-stone-100 truncate">
                             {activePlaylist.name}
                           </h2>
-                          <button
-                            onClick={() => {
-                              setEditPlaylistText(activePlaylist.name);
-                              setEditingPlaylistTitle(true);
-                            }}
-                            className="text-stone-500 hover:text-stone-300"
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </button>
+                          {!activeIsMix && (
+                            <button
+                              onClick={() => {
+                                setEditPlaylistText(activePlaylist.name);
+                                setEditingPlaylistTitle(true);
+                              }}
+                              className="text-stone-500 hover:text-stone-300"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
                       )}
                       <p className="text-xs text-stone-500 font-medium mt-0.5">
@@ -1270,16 +1329,30 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       >
                         <Share2 className="w-3.5 h-3.5" />
                       </button>
-                      <button
-                        onClick={() => {
-                          if (confirm(`Delete "${activePlaylist.name}"?`)) {
-                            onDeletePlaylist(activePlaylist.id);
-                          }
-                        }}
-                        className="p-1 text-stone-500 hover:text-red-400"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {activeIsMix ? (
+                        <button
+                          onClick={() => {
+                            const mix = smartMixes.find((m) => m.id === activePlaylist.id);
+                            if (mix) handleSaveMix(mix);
+                          }}
+                          disabled={activePlaylist.tracks.length === 0}
+                          className="px-3 py-1.5 bg-stone-900 hover:bg-stone-850 disabled:opacity-40 text-stone-200 border border-stone-800 font-semibold text-xs rounded-xl transition-colors cursor-pointer"
+                          title="Save mix as a playlist"
+                        >
+                          Save
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Delete "${activePlaylist.name}"?`)) {
+                              onDeletePlaylist(activePlaylist.id);
+                            }
+                          }}
+                          className="p-1 text-stone-500 hover:text-red-400"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1329,7 +1402,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                   <Download className="w-3.5 h-3.5" />
                                 </button>
                               )}
-                              <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              {!activeIsMix && (
+                                <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
                                   onClick={() => handleMovePlaylistTrack(idx, "up")}
                                   disabled={idx === 0}
@@ -1350,7 +1424,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                 >
                                   <Trash2 className="w-3 h-3" />
                                 </button>
-                              </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
