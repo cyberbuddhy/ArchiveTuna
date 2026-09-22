@@ -40,6 +40,7 @@ interface AlbumDetailModalProps {
   onUpdateTierList?: (tierList: TierList) => void;
   onCreateTierList?: (name: string, description?: string) => TierList | void;
   vaultAction?: { label: string; onAction: () => void };
+  isInVault?: boolean;
 }
 
 export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
@@ -56,6 +57,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   onUpdateTierList,
   onCreateTierList,
   vaultAction,
+  isInVault,
 }) => {
   const { playTrack, playAlbum, currentTrack, isPlaying } = usePlayer();
   const [activeTab, setActiveTab] = useState<"tracks" | "notes">("tracks");
@@ -305,6 +307,27 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                   <Heart className={`w-3.5 h-3.5 ${album.isFavorite ? "fill-rose-500 text-rose-500" : ""}`} />
                   <span className="text-xs font-medium">{album.isFavorite ? "Liked" : "Like"}</span>
                 </button>
+
+                {/* Add to Vault / In Vault */}
+                {isInVault ? (
+                  <span
+                    className="px-2.5 py-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 flex items-center space-x-1.5"
+                    title="Saved in your vault"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span className="text-xs font-medium">In Vault</span>
+                  </span>
+                ) : (
+                  <button
+                    id="detail-add-to-vault-btn"
+                    onClick={() => onUpdateAlbum(album)}
+                    className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 transition-colors flex items-center space-x-1.5 cursor-pointer shadow-sm"
+                    title="Save this album to your vault"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="text-xs font-bold">Add to Vault</span>
+                  </button>
+                )}
 
                 {/* Rate Button & Tier List Deployer Panel */}
                 <div className="relative">
