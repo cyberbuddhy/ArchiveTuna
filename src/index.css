@@ -14,6 +14,25 @@ body {
     overflow-x: clip;
   }
 }
+
+/* Visible keyboard focus everywhere inputs don't already show one.
+   Text fields signal focus through their own border color, so the global
+   outline skips them — one contour everywhere, never two. */
+:focus-visible:not(input):not(textarea):not(select) {
+  outline: 2px solid var(--color-accent-main);
+  outline-offset: 2px;
+}
+
+/* Respect users who ask to reduce motion — kill animation/transition globally */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 #root {
   overflow-x: clip;
   max-width: 100vw;

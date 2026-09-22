@@ -749,7 +749,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               if (e.key === "Escape") (e.target as HTMLInputElement).blur();
             }}
             placeholder="Search vault albums, playlists, songs, tier lists..."
-            className="w-full h-10 pl-9 pr-8 bg-stone-900 border border-stone-800 hover:border-stone-700 rounded-xl text-stone-100 placeholder-stone-400 text-xs leading-normal focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all shadow-sm"
+            aria-label="Search your vault"
+            className="w-full h-10 pl-9 pr-8 bg-stone-900 border border-stone-800 hover:border-stone-700 rounded-xl text-stone-100 placeholder-stone-400 text-xs leading-normal focus:outline-none focus:border-amber-500 transition-all shadow-sm"
           />
           {searchQuery && (
             <button
@@ -1127,6 +1128,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     <img
                       src={album.coverUrl || "https://archive.org/images/notfound.png"}
                       alt={album.title}
+                      loading="lazy"
+                      decoding="async"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = "https://archive.org/images/notfound.png";
                       }}
@@ -1530,6 +1533,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                           <img
                             src={album.coverUrl}
                             alt={album.title}
+                            loading="lazy"
+                            decoding="async"
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -1665,6 +1670,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                         src={artist.coverUrl}
                         alt={artist.name}
                         referrerPolicy="no-referrer"
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = "none";

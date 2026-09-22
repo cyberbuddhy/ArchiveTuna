@@ -201,7 +201,16 @@ export const TierListView: React.FC<TierListViewProps> = ({
           {tierLists.map((tl) => (
             <div
               key={tl.id}
+              role="button"
+              tabIndex={0}
+              aria-label={`Open tier list ${tl.name}`}
               onClick={() => setSelectedListId(tl.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSelectedListId(tl.id);
+                }
+              }}
               className={`group p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
                 selectedListId === tl.id
                   ? "bg-amber-500/10 border-amber-500/30 text-amber-300 shadow-sm"
@@ -389,6 +398,8 @@ export const TierListView: React.FC<TierListViewProps> = ({
                             }
                             alt={item.albumTitle}
                             referrerPolicy="no-referrer"
+                            loading="lazy"
+                            decoding="async"
                             className="w-full h-full object-cover"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src =

@@ -609,6 +609,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
+              aria-label="Search Archive.org music"
               value={searchQuery}
               onChange={(e) => {
                 suppressSuggestionsRef.current = false;
@@ -630,7 +631,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
                   ? 'Search genre or subject (e.g., "Post-Punk", "Bebop")...'
                   : "Search any artist, album, live bootleg, or genre..."
               }
-              className="w-full pl-12 pr-44 sm:pr-60 py-3.5 bg-stone-900/90 hover:bg-stone-900 border border-stone-800 focus:border-amber-500 rounded-2xl text-sm sm:text-base text-stone-100 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-colors shadow-inner relative z-0"
+              className="w-full pl-12 pr-44 sm:pr-60 py-3.5 bg-stone-900/90 hover:bg-stone-900 border border-stone-800 focus:border-amber-500 rounded-2xl text-sm sm:text-base text-stone-100 placeholder-stone-400 focus:outline-none transition-colors shadow-inner relative z-0"
             />
 
             <div className="absolute right-2 top-2 bottom-2 flex items-center space-x-1.5 z-20">
@@ -1209,6 +1210,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
                         }
                         alt={item.title}
                         referrerPolicy="no-referrer"
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src =

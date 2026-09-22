@@ -59,7 +59,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
   const isAlreadyInLibrary = previewAlbum ? existingAlbumIds.has(previewAlbum.id) : false;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+    <div role="dialog" aria-modal="true" aria-label="Capture music album" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
       <div
         id="capture-modal-container"
         className="w-full max-w-xl bg-stone-900 border border-stone-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
@@ -76,6 +76,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
           <button
             id="close-capture-modal-btn"
             onClick={onClose}
+            aria-label="Close capture dialog"
             className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -109,6 +110,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                 value={inputUrl}
                 onChange={(e) => setInputUrl(e.target.value)}
                 placeholder="https://archive.org/details/identifier or identifier"
+                aria-label="Archive.org URL or identifier to capture"
                 className="w-full pl-10 pr-24 py-3 bg-stone-950 border border-stone-800 rounded-xl text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500 text-sm"
               />
               <button

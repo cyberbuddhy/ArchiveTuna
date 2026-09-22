@@ -905,7 +905,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
                   >
                     <div
                       onClick={() => playTrack(track)}
-                      className="flex items-center space-x-3 truncate cursor-pointer flex-1 mr-2"
+                      className="flex items-center space-x-3 truncate cursor-pointer flex-1 min-w-0 mr-2"
                     >
                       <span className="text-stone-500 text-[10px] font-mono w-5 text-center">
                         {isCurrent && isPlaying ? (
@@ -1266,6 +1266,8 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
             <div className="flex items-center space-x-2">
               <button
                 onClick={toggleMute}
+                aria-label={isMuted ? "Unmute" : "Mute"}
+                aria-pressed={isMuted}
                 className="text-stone-400 hover:text-stone-200 transition-colors cursor-pointer"
                 title={isMuted ? "Unmute (M)" : "Mute (M)"}
               >
@@ -1286,6 +1288,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
                 onChange={(e) => setVolume(parseFloat(e.target.value))}
                 className="w-18 h-1.5 bg-stone-800 rounded-lg accent-amber-500 cursor-pointer"
                 title={`Volume: ${Math.round((isMuted ? 0 : volume) * 100)}%`}
+                aria-label="Volume"
               />
             </div>
 

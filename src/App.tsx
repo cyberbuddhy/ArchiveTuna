@@ -563,7 +563,7 @@ export default function App() {
 
         {/* Global Toast Notification */}
         {toastMessage && (
-          <div className="fixed top-16 right-4 z-50 flex items-center space-x-2 px-3 py-2 rounded-lg bg-stone-900 border border-amber-500/40 text-stone-100 text-xs shadow-2xl animate-in fade-in slide-in-from-top-2">
+          <div role="status" className="fixed top-16 right-4 z-50 flex items-center space-x-2 px-3 py-2 rounded-lg bg-stone-900 border border-amber-500/40 text-stone-100 text-xs shadow-2xl animate-in fade-in slide-in-from-top-2">
             <CheckCircle2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <span className="font-medium">{toastMessage.text}</span>
           </div>

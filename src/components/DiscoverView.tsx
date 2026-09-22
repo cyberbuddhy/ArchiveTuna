@@ -590,7 +590,16 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
                     <div
                       key={item.identifier}
                       id={`discover-card-${item.identifier}`}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Open ${item.title}`}
                       onClick={() => onSelectAlbumForDetail(item)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onSelectAlbumForDetail(item);
+                        }
+                      }}
                       className="group bg-stone-900/40 hover:bg-stone-850/80 border border-stone-800 hover:border-stone-700 rounded-2xl p-3 transition-all hover:shadow-xl cursor-pointer"
                     >
                       <div className="aspect-square rounded-xl overflow-hidden bg-stone-950 border border-stone-850 relative group-hover:shadow-md mb-2.5">

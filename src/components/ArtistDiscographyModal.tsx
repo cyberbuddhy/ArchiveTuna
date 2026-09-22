@@ -180,6 +180,9 @@ export const ArtistDiscographyModal: React.FC<ArtistDiscographyModalProps> = ({
   return (
     <div
       id="artist-discography-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Artist discography"
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fade-in"
       onClick={onClose}
     >
@@ -438,6 +441,8 @@ export const ArtistDiscographyModal: React.FC<ArtistDiscographyModalProps> = ({
                               src={stream.coverUrl}
                               alt={stream.title}
                               referrerPolicy="no-referrer"
+                              loading="lazy"
+                              decoding="async"
                               className="w-full h-full object-cover"
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src =
@@ -619,6 +624,8 @@ export const ArtistDiscographyModal: React.FC<ArtistDiscographyModalProps> = ({
                             src={tape.coverUrl}
                             alt={tape.title}
                             referrerPolicy="no-referrer"
+                            loading="lazy"
+                            decoding="async"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src =
@@ -756,10 +763,12 @@ export const ArtistDiscographyModal: React.FC<ArtistDiscographyModalProps> = ({
                         <div className="relative aspect-square rounded-lg overflow-hidden bg-stone-850 mb-2.5 shadow-inner flex items-center justify-center">
                           {release.coverUrl ? (
                             <img
-                              src={release.coverUrl}
-                              alt={release.title}
-                              referrerPolicy="no-referrer"
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            src={release.coverUrl}
+                            alt={release.title}
+                            referrerPolicy="no-referrer"
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                               onError={(e) => {
                                 (e.target as HTMLElement).style.display = "none";
                                 const fallback = (e.target as HTMLElement).nextElementSibling;

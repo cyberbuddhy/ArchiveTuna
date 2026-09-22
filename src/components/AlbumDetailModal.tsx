@@ -271,7 +271,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   const formatDuration = (seconds: number) => formatTime(seconds, "--:--");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
+    <div role="dialog" aria-modal="true" aria-label={`Details for ${album?.title || "album"}`} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
       <div
         id="album-detail-modal"
         className="w-full max-w-3xl bg-stone-900 border border-stone-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
@@ -282,6 +282,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
           <button
             id="close-album-detail-btn"
             onClick={onClose}
+            aria-label="Close album details"
             className="absolute top-4 right-4 p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors z-10"
           >
             <X className="w-5 h-5" />
