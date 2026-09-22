@@ -267,8 +267,12 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     const list: { track: Track; album: Album }[] = [];
     const seen = new Set<string>();
     const push = (track: Track | null | undefined, album: Album) => {
-      if (!track || !track.id || seen.has(track.id)) return;
-      seen.add(track.id);
+      if (!track || !track.id) return;
+      // Same recording may legitimately repeat across vault/playlist/offline/local —
+      // dedupe only exact same-track-in-same-context entries
+      const key = `${track.id}__${album?.id || ""}`;
+      if (seen.has(key)) return;
+      seen.add(key);
       list.push({ track, album });
     };
     const fallbackAlbum = (
@@ -423,9 +427,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     return m;
   }, [localEntries]);
 
-  // Local tracks carry no URL until resolved — hydrate them before queuing
+  // Local tracks carry no URL until resolved — hydrate them before queuing.
+  // Pairs are keyed by track+album so the same recording can repeat in All Songs.
+  const pairKey = (t: Track, a?: Album) => `${t.id}__${a?.id || ""}`;
   const resolveSongsQueue = async (pairs: { track: Track; album: Album }[]) => {
-    const tracks: Track[] = [];
+    const resolved: { track: Track; album: Album }[] = [];
     const albumsById = new Map<string, Album>();
     for (const { track, album } of pairs) {
       if (track.albumId === "local_library" && !track.streamUrl) {
@@ -433,17 +439,20 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         if (!entry) continue;
         try {
           const url = await resolveObjectUrl(entry);
-          tracks.push({ ...track, streamUrl: url, audioUrl: url });
+          const hydrated = { ...track, streamUrl: url, audioUrl: url };
+          resolved.push({ track: hydrated, album });
+          albumsById.set(pairKey(track, album), album);
           albumsById.set(track.id, album);
         } catch {
           // Unreachable file (folder moved?) — skip, keep the queue going
         }
       } else {
-        tracks.push(track);
+        resolved.push({ track, album });
+        albumsById.set(pairKey(track, album), album);
         albumsById.set(track.id, album);
       }
     }
-    return { tracks, albumsById };
+    return { pairs: resolved, tracks: resolved.map((p) => p.track), albumsById };
   };
 
   const handleRandomPlayAllSongs = async () => {
@@ -469,22 +478,24 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const handlePlayAllSongsInOrder = async () => {
     const targetPool = displayedSongs.length > 0 ? displayedSongs : allSongs;
     if (targetPool.length === 0) return;
-    const { tracks, albumsById } = await resolveSongsQueue(targetPool);
-    if (tracks.length === 0) return;
-    playTrack(tracks[0], albumsById.get(tracks[0].id), tracks);
+    const { pairs } = await resolveSongsQueue(targetPool);
+    if (pairs.length === 0) return;
+    playTrack(pairs[0].track, pairs[0].album, pairs.map((p) => p.track));
     if (onShowToast) {
-      onShowToast(`Playing ${tracks.length} songs in order`, "info");
+      onShowToast(`Playing ${pairs.length} songs in order`, "info");
     }
   };
 
   const handlePlaySongFromAll = async (pair: { track: Track; album: Album }) => {
-    const { tracks, albumsById } = await resolveSongsQueue(displayedSongs);
-    const idx = tracks.findIndex((t) => t.id === pair.track.id);
+    const { pairs } = await resolveSongsQueue(displayedSongs);
+    const idx = pairs.findIndex(
+      (p) => p.track.id === pair.track.id && (p.album?.id || "") === (pair.album?.id || "")
+    );
     if (idx === -1) {
       if (onShowToast) onShowToast("That file isn't reachable — hit Resync or re-pick the folder.", "info");
       return;
     }
-    playTrack(tracks[idx], albumsById.get(tracks[idx].id), tracks);
+    playTrack(pairs[idx].track, pairs[idx].album, pairs.map((p) => p.track));
   };
 
   // Offline Cached audio memoized list

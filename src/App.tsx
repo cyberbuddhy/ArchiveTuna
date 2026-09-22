@@ -264,12 +264,13 @@ export default function App() {
 
   const openSharedPlaylist = (name: string, tracks: Track[]) => {
     const first = tracks[0];
+    const stamp = Date.now();
     const album: Album = {
-      id: `shared_${Date.now()}`,
-      identifier: `shared_${Date.now()}`,
+      id: `shared_${stamp}`,
+      identifier: `shared_${stamp}`,
       title: name,
       artist: "Shared mixtape",
-      coverUrl: `https://archive.org/services/img/${first.albumId}`,
+      coverUrl: first.albumId ? `https://archive.org/services/img/${first.albumId}` : undefined,
       collection: "Shared Mixtape",
       tracks: tracks.map((t, i) => ({ ...t, trackNumber: i + 1, album: name })),
       source: "Shared link",
