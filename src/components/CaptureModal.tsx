@@ -96,7 +96,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
           <form onSubmit={handleResolve} className="space-y-3">
             <div className="flex gap-2">
               {(["auto", "mp3", "flac"] as IngestQuality[]).map((q) => (
-                <button key={q} type="button" onClick={() => setQuality(q)} className={`px-2 py-1 text-[11px] rounded-lg border cursor-pointer ${quality === q ? "bg-amber-500 text-stone-950 border-amber-500 font-bold" : "bg-stone-950 text-stone-400 border-stone-800"}`}>{q.toUpperCase()}</button>
+                <button key={q} type="button" onClick={() => setQuality(q)} className={`px-2.5 py-1.5 text-[11px] rounded-xl border cursor-pointer transition-colors ${quality === q ? "bg-amber-500 text-stone-950 border-amber-500 font-bold" : "bg-stone-950 text-stone-400 border-stone-800 hover:text-stone-200"}`}>{q.toUpperCase()}</button>
               ))}
               <span className="text-[10px] text-stone-500 self-center">format negotiation · ID3 preserved</span>
             </div>
@@ -117,7 +117,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                 id="fetch-album-btn"
                 type="submit"
                 disabled={isLoading || !inputUrl.trim()}
-                className="absolute right-2 top-2 bottom-2 px-4 bg-amber-500 hover:bg-amber-400 disabled:bg-stone-800 text-stone-950 disabled:text-stone-600 font-medium text-xs rounded-lg transition-colors flex items-center space-x-1.5"
+                className="absolute right-2 top-2 bottom-2 px-4 bg-amber-500 hover:bg-amber-400 disabled:bg-stone-800 text-stone-950 disabled:text-stone-600 font-medium text-xs rounded-xl transition-colors flex items-center space-x-1.5"
               >
                 {isLoading ? (
                   <>

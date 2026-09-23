@@ -148,7 +148,7 @@ export const TierListView: React.FC<TierListViewProps> = ({
           <button
             id="new-tier-list-btn"
             onClick={() => setIsCreatingList(true)}
-            className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs flex items-center space-x-1 cursor-pointer transition-colors"
+            className="p-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs flex items-center space-x-1 cursor-pointer transition-colors"
             title="Create new Tier List"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -188,7 +188,7 @@ export const TierListView: React.FC<TierListViewProps> = ({
               </button>
               <button
                 type="submit"
-                className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-stone-950 font-semibold text-xs rounded-md"
+                className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-stone-950 font-semibold text-xs rounded-xl"
               >
                 Create
               </button>
@@ -236,7 +236,7 @@ export const TierListView: React.FC<TierListViewProps> = ({
                       }
                     }
                 }}
-                className="p-1 text-stone-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="p-1.5 rounded-lg text-stone-500 hover:text-red-400 hover:bg-stone-800 opacity-0 group-hover:opacity-100 transition-opacity"
                 title="Delete Tier List"
               >
                 <Trash2 className="w-3.5 h-3.5" />

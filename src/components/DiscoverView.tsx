@@ -348,7 +348,7 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="p-1 text-stone-500 hover:text-amber-400 hover:bg-stone-800 rounded transition-colors shrink-0"
+                          className="p-1.5 rounded-lg text-stone-500 hover:text-amber-400 hover:bg-stone-800 transition-colors shrink-0"
                           title={`View ${item.node.name} on Wikipedia`}
                         >
                           <ExternalLink className="w-3 h-3" />
@@ -361,8 +361,12 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
                   ))}
                 </div>
               ) : (
-                <div className="py-8 text-center text-stone-500 text-xs">
-                  No genres matching "{genreSearch}"
+                <div className="py-8 text-center space-y-2">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 mx-auto flex items-center justify-center text-amber-400">
+                    <Search className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-sm font-bold text-stone-200">No matches</h3>
+                  <p className="text-xs text-stone-400">No genres matching "{genreSearch}"</p>
                 </div>
               )
             ) : (
@@ -409,7 +413,7 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="p-1 text-stone-500 hover:text-amber-400 hover:bg-stone-800 rounded transition-colors shrink-0"
+                            className="p-1.5 rounded-lg text-stone-500 hover:text-amber-400 hover:bg-stone-800 transition-colors shrink-0"
                             title={
                               item.description
                                 ? `${item.description} — View on Wikipedia`
@@ -588,9 +592,12 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
                 <p className="text-xs text-stone-400">Loading master recordings from Archive.org...</p>
               </div>
             ) : recordings.length === 0 ? (
-              <div className="py-16 text-center rounded-2xl bg-stone-900/30 border border-stone-800 p-8 space-y-2">
-                <Music className="w-8 h-8 text-stone-600 mx-auto" />
-                <p className="text-xs text-stone-400">
+              <div className="py-16 text-center space-y-3 rounded-2xl bg-stone-900/30 border border-stone-800 p-8">
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 mx-auto flex items-center justify-center text-amber-400">
+                  <Music className="w-7 h-7" />
+                </div>
+                <h3 className="text-sm font-bold text-stone-200">No matches in this genre</h3>
+                <p className="text-xs text-stone-400 max-w-md mx-auto leading-relaxed">
                   No audio matches found for this genre selection.
                 </p>
               </div>

@@ -305,7 +305,7 @@ export const DumpBackupModal: React.FC<DumpBackupModalProps> = ({
                       onClick={() => setRestoreMode("replace")}
                       className={`p-2.5 rounded-lg border text-left text-xs transition-colors ${
                         restoreMode === "replace"
-                          ? "border-red-500/80 bg-red-500/10 text-red-300"
+                          ? "border-rose-500/80 bg-rose-500/10 text-rose-300"
                           : "border-stone-800 bg-stone-950 text-stone-400 hover:border-stone-700"
                       }`}
                     >
