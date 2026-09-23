@@ -58,6 +58,7 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [sectionTitle, setSectionTitle] = useState("Featured Archival Classics");
   const [capturingId, setCapturingId] = useState<string | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
 
   // Pagination
   const [currentQuery, setCurrentQuery] = useState("");
@@ -206,6 +207,20 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
       }
     } catch (err) {
       console.error("Playback preview failed:", err);
+    }
+  };
+
+  const handleOpenItemDetail = async (identifier: string) => {
+    if (openingId) return;
+    setOpeningId(identifier);
+    try {
+      // Search items carry no tracks — resolve full details or the modal opens empty
+      const full = await fetchAlbumDetails(identifier);
+      onSelectAlbumForDetail(full);
+    } catch (err) {
+      console.error("Failed to open album detail:", err);
+    } finally {
+      setOpeningId(null);
     }
   };
 
@@ -593,14 +608,16 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
                       role="button"
                       tabIndex={0}
                       aria-label={`Open ${item.title}`}
-                      onClick={() => onSelectAlbumForDetail(item)}
+                      onClick={() => handleOpenItemDetail(item.identifier)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          onSelectAlbumForDetail(item);
+                          handleOpenItemDetail(item.identifier);
                         }
                       }}
-                      className="group bg-stone-900/40 hover:bg-stone-850/80 border border-stone-800 hover:border-stone-700 rounded-2xl p-3 transition-all hover:shadow-xl cursor-pointer"
+                      className={`group bg-stone-900/40 hover:bg-stone-850/80 border border-stone-800 hover:border-stone-700 rounded-2xl p-3 transition-all hover:shadow-xl cursor-pointer ${
+                        openingId === item.identifier ? "opacity-60" : ""
+                      }`}
                     >
                       <div className="aspect-square rounded-xl overflow-hidden bg-stone-950 border border-stone-850 relative group-hover:shadow-md mb-2.5">
                         {item.coverUrl ? (

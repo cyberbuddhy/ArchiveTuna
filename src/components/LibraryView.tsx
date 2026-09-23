@@ -1121,7 +1121,19 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 <div
                   key={album.id}
                   className="group bg-stone-900/50 hover:bg-stone-900 border border-stone-800 hover:border-stone-700 rounded-xl p-2.5 transition-colors cursor-pointer"
-                  onClick={() => onSelectAlbum(album)}
+                  onClick={async () => {
+                    // Vault copies captured during an outage can be trackless — refetch, else open as-is
+                    if ((!album.tracks || album.tracks.length === 0) && album.identifier) {
+                      try {
+                        const full = await fetchAlbumDetails(album.identifier);
+                        onSelectAlbum(full);
+                        return;
+                      } catch {
+                        // fall through to the stored copy
+                      }
+                    }
+                    onSelectAlbum(album);
+                  }}
                 >
                   {/* Clean Album Cover Art - No icons on top of the cover art */}
                   <div className="relative aspect-square rounded-lg overflow-hidden bg-stone-950 border border-stone-800">
