@@ -130,7 +130,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (updated.defaultPlaybackRate !== undefined) {
         setPlaybackRateState(updated.defaultPlaybackRate);
         if (audioRef.current) {
-          audioRef.current.playbackRate = updated.defaultPlaybackRate;
+          audioEngine.setTempo(audioRef.current, updated.defaultPlaybackRate);
         }
       }
       audioEngine.updateSettings(updated);
@@ -400,7 +400,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       audio.src = playbackSrc;
       const targetVol = isMuted ? 0 : volume;
       audio.volume = targetVol;
-      audio.playbackRate = playbackRate;
+      audioEngine.setTempo(audio, stateRef.current.playbackRate);
 
       // Initialize audio DSP engine (warmth, gain normalization, crossfade)
       audioEngine.init(audio);
@@ -553,7 +553,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const setPlaybackRate = (rate: number) => {
     setPlaybackRateState(rate);
     if (audioRef.current) {
-      audioRef.current.playbackRate = rate;
+      audioEngine.setTempo(audioRef.current, rate);
     }
   };
 

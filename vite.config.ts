@@ -34,6 +34,11 @@ export default defineConfig(() => {
               handler: 'CacheFirst',
               options: { cacheName: 'archive-covers', expiration: { maxEntries: 200, maxAgeSeconds: 2592000 } },
             },
+            {
+              urlPattern: /^https:\/\/coverartarchive\.org\/.*/i,
+              handler: 'CacheFirst',
+              options: { cacheName: 'mb-covers', expiration: { maxEntries: 300, maxAgeSeconds: 2592000 } },
+            },
           ],
         },
       }),
